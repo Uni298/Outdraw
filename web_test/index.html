@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>QuickDraw CNN Demo</title>
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    #canvasWrapper { border: 1px solid #ccc; display: inline-block; position: relative; }
+    canvas { background: white; cursor: crosshair; }
+    #controls { margin-top: 10px; }
+    #results { margin-top: 20px; }
+    .prediction { margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>QuickDraw CNN Demo</h1>
+
+  <div id="canvasWrapper">
+    <canvas id="draw" width="256" height="256"></canvas>
+  </div>
+
+  <div id="controls">
+    <button id="clearBtn">クリア</button>
+    <button id="predictBtn">予測する</button>
+  </div>
+
+  <div id="results">
+    <h2>予測結果</h2>
+    <div id="output"></div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('draw');
+    const ctx = canvas.getContext('2d');
+    const clearBtn = document.getElementById('clearBtn');
+    const predictBtn = document.getElementById('predictBtn');
+    const output = document.getElementById('output');
+
+    // 描画設定
+    ctx.lineWidth = 8;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = 'black';
+
+    let drawing = false;
+    let currentStroke = null;
+    let strokes = []; // QuickDraw形式: [ [xs...], [ys...] ] の配列
+
+    function getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX || e.touches[0].clientX) - rect.left;
+      const y = (e.clientY || e.touches[0].clientY) - rect.top;
+      return { x, y };
+    }
+
+    function startDraw(e) {
+      e.preventDefault();
+      drawing = true;
+      const pos = getCanvasPos(e);
+      ctx.beginPath();
+      ctx.moveTo(pos.x, pos.y);
+
+      currentStroke = [[], []]; // [xs, ys]
+      currentStroke[0].push(pos.x);
+      currentStroke[1].push(pos.y);
+    }
+
+    function moveDraw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      const pos = getCanvasPos(e);
+      ctx.lineTo(pos.x, pos.y);
+      ctx.stroke();
+
+      currentStroke[0].push(pos.x);
+      currentStroke[1].push(pos.y);
+    }
+
+    function endDraw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      drawing = false;
+      if (currentStroke && currentStroke[0].length > 0) {
+        strokes.push(currentStroke);
+      }
+      currentStroke = null;
+    }
+
+    // マウス
+    canvas.addEventListener('mousedown', startDraw);
+    canvas.addEventListener('mousemove', moveDraw);
+    canvas.addEventListener('mouseup', endDraw);
+    canvas.addEventListener('mouseleave', endDraw);
+
+    // タッチ
+    canvas.addEventListener('touchstart', startDraw);
+    canvas.addEventListener('touchmove', moveDraw);
+    canvas.addEventListener('touchend', endDraw);
+    canvas.addEventListener('touchcancel', endDraw);
+
+    // クリアボタン
+    clearBtn.addEventListener('click', () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      strokes = [];
+      output.innerHTML = '';
+    });
+
+    // 初期背景を白に
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 予測ボタン
+    predictBtn.addEventListener('click', async () => {
+      if (strokes.length === 0) {
+        alert('何か描いてください');
+        return;
+      }
+
+      // strokes はすでに QuickDraw 形式:
+      // [ [x1...], [y1...] ] の配列の配列
+      // これをそのままサーバに送る
+      try {
+        output.innerHTML = '予測中...';
+
+        const res = await fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ strokes })
+        });
+
+        const json = await res.json();
+        if (!json.ok) {
+          output.innerHTML = 'エラー: ' + (json.error || 'unknown');
+          return;
+        }
+
+        const result = json.result;
+        const topN = result.topN || [];
+
+        let html = '';
+        html += `<div>推定クラス: <b>${result.className}</b></div>`;
+        html += `<div>スコア(距離っぽい値): ${result.distance}</div>`;
+        html += '<hr />';
+        html += '<div>Top N:</div>';
+
+        topN.forEach((item, idx) => {
+          html += `<div class="prediction">#${idx+1}: ${item.name} (score: ${item.score?.toFixed(3) ?? 'n/a'})</div>`;
+        });
+
+        output.innerHTML = html;
+
+      } catch (err) {
+        console.error(err);
+        output.innerHTML = '通信エラー';
+      }
+    });
+  </script>
+</body>
+</html>
+

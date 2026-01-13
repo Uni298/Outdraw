@@ -1,0 +1,10 @@
+{
+  "maxPlayers": 6,
+  "defaultDrawingTimeSeconds": 90,
+  "defaultGuessingTimeSeconds": 30,
+  "defaultAiTopN": 3,
+  "categoriesFile": "categories_jp.txt",
+  "pythonScript": "test_headless.py",
+  "modelDir": "png_model_32",
+  "port": 3000
+}

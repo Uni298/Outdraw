@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>お絵描き vs AI</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Lobby Screen -->
+      <div id="lobby-screen" class="screen active">
+        <div class="container">
+          <h1 class="title">🎨 お絵描き vs AI</h1>
+          <p class="subtitle">
+            AIには分からないように、人間だけに伝わる絵を描こう!
+          </p>
+
+          <div class="card">
+            <div class="input-group">
+              <label for="player-name">プレイヤー名</label>
+              <input
+                type="text"
+                id="player-name"
+                placeholder="名前を入力"
+                maxlength="20"
+              />
+            </div>
+
+            <div class="button-group">
+              <button id="create-room-btn" class="btn btn-primary">
+                部屋を作成
+              </button>
+              <button id="join-room-btn" class="btn btn-secondary">
+                部屋に参加
+              </button>
+            </div>
+
+            <div id="join-room-input" class="input-group hidden">
+              <label for="room-code">部屋コード</label>
+              <input
+                type="text"
+                id="room-code"
+                placeholder="6桁のコード"
+                maxlength="6"
+              />
+              <button id="join-confirm-btn" class="btn btn-primary">
+                参加する
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Room Screen -->
+      <div id="room-screen" class="screen">
+        <div class="container">
+          <div class="room-header">
+            <h2>
+              部屋コード:
+              <span id="room-code-display" class="code">------</span>
+            </h2>
+            <button id="leave-room-btn" class="btn btn-danger">退出</button>
+          </div>
+
+          <div class="room-content">
+            <div class="card">
+              <h3>プレイヤー (<span id="player-count">0</span>/6)</h3>
+              <div id="player-list" class="player-list"></div>
+            </div>
+
+            <div class="card" id="settings-card">
+              <h3>ゲーム設定 <span class="host-badge">ホスト専用</span></h3>
+              <div class="settings-grid">
+                <div class="setting-item">
+                  <label for="drawing-time">描画時間 (秒)</label>
+                  <input
+                    type="number"
+                    id="drawing-time"
+                    min="30"
+                    max="180"
+                    value="90"
+                  />
+                </div>
+                <div class="setting-item">
+                  <label for="guessing-time">回答時間 (秒)</label>
+                  <input
+                    type="number"
+                    id="guessing-time"
+                    min="15"
+                    max="60"
+                    value="30"
+                  />
+                </div>
+                <div class="setting-item">
+                  <label for="ai-top-n">AI判定範囲 (トップN)</label>
+                  <select id="ai-top-n">
+                    <option value="1">1位のみ</option>
+                    <option value="2">2位まで</option>
+                    <option value="3" selected>3位まで</option>
+                  </select>
+                </div>
+                <div class="setting-item">
+                  <input
+                    type="number"
+                    id="max-rounds"
+                    min="1"
+                    max="12"
+                    value="6"
+                  />
+                </div>
+                <div class="setting-item">
+                  <label for="active-category-count">モデル制限 (カテゴリ数)</label>
+                  <input
+                    type="number"
+                    id="active-category-count"
+                    min="3"
+                    max="345"
+                    value="10"
+                  />
+                </div>
+              </div>
+              <button id="update-settings-btn" class="btn btn-secondary">
+                設定を更新
+              </button>
+            </div>
+          </div>
+
+          <button id="start-game-btn" class="btn btn-primary btn-large">
+            ゲーム開始
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Selection Screen -->
+      <div id="category-screen" class="screen">
+        <div class="container">
+          <h2 class="phase-title">お題を選んでください</h2>
+          <div id="category-choices" class="category-grid"></div>
+          <div id="waiting-category" class="waiting hidden">
+            <div class="spinner"></div>
+            <p>描く人がお題を選んでいます...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Drawing Screen -->
+      <div id="drawing-screen" class="screen">
+        <div class="container">
+          <div class="game-header">
+            <div class="round-info">
+              ラウンド <span id="current-round">1</span>/<span
+                id="max-rounds-display"
+                >6</span
+              >
+            </div>
+            <div class="timer" id="drawing-timer">90</div>
+            <div class="category-display">
+              お題: <span id="current-category">???</span>
+            </div>
+          </div>
+
+          <div class="drawing-area">
+            <div class="canvas-container">
+              <canvas id="drawing-canvas" width="800" height="600"></canvas>
+              <div class="canvas-tools">
+                <button id="clear-canvas-btn" class="btn btn-secondary">
+                  クリア
+                </button>
+                <button id="end-drawing-btn" class="btn btn-primary">
+                  描画完了
+                </button>
+              </div>
+            </div>
+
+            <div class="sidebar">
+              <div class="card">
+                <h3>プレイヤー</h3>
+                <div id="game-player-list" class="player-list-small"></div>
+              </div>
+              <div class="card">
+                <h3>スコア</h3>
+                <div id="score-list" class="score-list"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="spectator-message" class="spectator-message hidden">
+            <p>🎨 <span id="drawer-name">プレイヤー</span> が描いています...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Guessing Screen -->
+      <div id="guessing-screen" class="screen">
+        <div class="container">
+          <div class="game-header">
+            <div class="round-info">
+              ラウンド <span id="guess-round">1</span>/<span
+                id="guess-max-rounds"
+                >6</span
+              >
+            </div>
+            <div class="timer" id="guessing-timer">30</div>
+          </div>
+
+          <div class="guessing-area">
+            <div class="canvas-container">
+              <canvas id="guess-canvas" width="800" height="600"></canvas>
+            </div>
+
+                    <div class="sidebar">
+                        <div class="card">
+                            <h3>この絵は何?</h3>
+                            <div class="input-group">
+                                <input type="text" id="category-search" placeholder="カテゴリを検索..." autocomplete="off">
+                                <div id="category-list" class="category-selector">
+                                    <!-- Categories will be populated here -->
+                                </div>
+                                <button id="submit-guess-btn" class="btn btn-primary" disabled>回答する</button>
+                            </div>
+                            <div id="guess-status" class="guess-status"></div>
+                            <div id="selected-category" class="selected-category hidden">
+                                選択中: <span id="selected-category-name"></span>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <h3>回答済みプレイヤー</h3>
+                            <div id="guessed-players" class="guessed-list"></div>
+                        </div>
+                    </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results Screen -->
+      <div id="results-screen" class="screen">
+        <div class="container">
+          <h2 class="phase-title">ラウンド結果</h2>
+
+          <div class="results-content">
+            <div class="winner-banner" id="winner-banner">
+              <div class="winner-icon">🏆</div>
+              <div class="winner-text" id="winner-text">人間チームの勝利!</div>
+            </div>
+
+            <div class="results-grid">
+              <div class="card">
+                <h3>正解</h3>
+                <div class="correct-answer" id="correct-answer">cat</div>
+              </div>
+
+              <div class="card">
+                <h3>人間の回答</h3>
+                <div id="human-guesses" class="guess-results"></div>
+              </div>
+
+              <div class="card">
+                <h3>AIの予測 (トップ3)</h3>
+                <div id="ai-predictions" class="ai-results"></div>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3>現在のスコア</h3>
+              <div id="results-score-list" class="score-list"></div>
+            </div>
+          </div>
+
+          <button id="next-round-btn" class="btn btn-primary btn-large">
+            次のラウンド
+          </button>
+          <div id="waiting-next" class="waiting hidden">
+            <p>ホストが次のラウンドを開始するのを待っています...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Finished Screen -->
+      <div id="finished-screen" class="screen">
+        <div class="container">
+          <h1 class="title">🎉 ゲーム終了!</h1>
+
+          <div class="card">
+            <h3>最終スコア</h3>
+            <div id="final-score-list" class="score-list-large"></div>
+          </div>
+
+          <button id="new-game-btn" class="btn btn-primary btn-large">
+            新しいゲーム
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/canvas.js"></script>
+    <script src="/js/ui.js"></script>
+    <script src="/js/client.js"></script>
+  </body>
+</html>
