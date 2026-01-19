@@ -39,6 +39,7 @@ class GameManager {
         maxRounds: 6,
         activeCategoryCount: 10 // Default limit representing random 3 choices will come from this pool
       },
+      aiScore: 0,
       gameState: 'lobby', // lobby, category-selection, drawing, guessing, results, finished
       currentRound: 0,
       currentDrawer: null,
@@ -236,16 +237,14 @@ class GameManager {
         room.aiConfidence = result.confidence;
         room.aiInputDebug = result.input; // 32x32 float array
 
-        // AI is correct if top prediction matches the correct answer
-        // Note: We no longer require confidence threshold - judge all drawings
-        const topPrediction = filteredTopN.length > 0 ? filteredTopN[0] : null;
-        // Fixed bug: compare category name via index
-
-        room.aiCorrectThisRound = result.topN.some(
-          item => this.categories[item.index] === room.currentCategory
+        // AI is correct if any of the top N predictions match the correct answer
+        room.aiCorrectThisRound = room.aiPredictions.some(
+          pred => pred.name === room.currentCategory
         );
 
-        [topPrediction.index] === room.currentCategory;
+        console.log(`[Game Manager] AI predictions: ${room.aiPredictions.map(p => p.name).join(', ')}`);
+        console.log(`[Game Manager] Correct answer: ${room.currentCategory}`);
+        console.log(`[Game Manager] AI correct: ${room.aiCorrectThisRound}`);
 
       } else {
         room.aiPredictions = [];
@@ -325,13 +324,14 @@ class GameManager {
     // AI が正解なら無条件で AI 勝利
     if (aiCorrect) {
       winner = 'ai';
+      room.aiScore += 1;
     }
 
     // AI が不正解で、人間が正解なら人間勝利
     else if (humanCorrect.length > 0) {
       winner = 'humans';
-      humanCorrect.forEach(pid => room.players.get(pid).score += 10);
-      room.players.get(room.currentDrawer).score += 5;
+      humanCorrect.forEach(pid => room.players.get(pid).score += 1);
+      room.players.get(room.currentDrawer).score += 1;
     }
 
     // AI も人間も不正解なら draw のまま
@@ -343,6 +343,7 @@ class GameManager {
       humanCorrect,
       aiCorrect,
       aiPredictions: room.aiPredictions,
+      drawing: room.currentDrawing,
       allGuesses: Array.from(room.guesses.entries()).map(([id, guess]) => ({
         playerId: id,
         playerName: room.players.get(id).name,

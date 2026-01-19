@@ -36,6 +36,7 @@ function emitRoomState(roomId) {
     currentRound: room.currentRound,
     maxRounds: room.settings.maxRounds,
     players: Array.from(room.players.values()),
+    aiScore: room.aiScore,
     currentDrawer: room.currentDrawer,
     activeCategoryIndices: room.activeCategoryIndices,
     settings: room.settings
@@ -222,6 +223,34 @@ io.on('connection', (socket) => {
     if (gameManager.nextRound(roomId)) {
       emitRoomState(roomId);
     }
+  });
+
+  // Chat message
+  socket.on('chat-message', ({ message }) => {
+    const room = gameManager.getRoomBySocket(socket.id);
+    if (!room) return;
+
+    const player = room.players.get(socket.id);
+    if (!player) return;
+
+    // Broadcast chat message to all players in the room
+    io.to(room.id).emit('chat-message', {
+      playerId: socket.id,
+      playerName: player.name,
+      message: message
+    });
+  });
+
+  // Reaction
+  socket.on('reaction', ({ roomId, emoji }) => {
+    const room = gameManager.getRoom(roomId);
+    if (!room) return;
+
+    // Broadcast reaction to all players in the room with sender's ID
+    io.to(roomId).emit('reaction', { 
+      emoji,
+      playerId: socket.id
+    });
   });
 
   // Disconnect

@@ -76,7 +76,7 @@
             </div>
 
             <div class="card" id="settings-card">
-              <h3>ゲーム設定 <span class="host-badge">ホスト専用</span></h3>
+              <h3>ゲーム設定 <span id="host-only-badge" class="host-badge hidden">ホスト専用</span></h3>
               <div class="settings-grid">
                 <div class="setting-item">
                   <label for="drawing-time">描画時間 (秒)</label>
@@ -126,7 +126,7 @@
                   />
                 </div>
               </div>
-              <button id="update-settings-btn" class="btn btn-secondary">
+              <button id="update-settings-btn" class="btn btn-secondary" style="display: none;">
                 設定を更新
               </button>
             </div>
@@ -169,14 +169,6 @@
           <div class="drawing-area">
             <div class="canvas-container">
               <canvas id="drawing-canvas" width="800" height="600"></canvas>
-              <div class="canvas-tools">
-                <button id="clear-canvas-btn" class="btn btn-secondary">
-                  クリア
-                </button>
-                <button id="end-drawing-btn" class="btn btn-primary">
-                  描画完了
-                </button>
-              </div>
             </div>
 
             <div class="sidebar">
@@ -187,6 +179,22 @@
               <div class="card">
                 <h3>スコア</h3>
                 <div id="score-list" class="score-list"></div>
+              </div>
+              <div class="canvas-tools" id="drawing-tools" style="display: none;">
+                <button id="clear-canvas-btn" class="btn btn-secondary">
+                  クリア
+                </button>
+                <button id="end-drawing-btn" class="btn btn-primary">
+                  描画完了
+                </button>
+              </div>
+              <div class="card" id="reaction-card" style="display: none;">
+                <h3>リアクション</h3>
+                <div class="reaction-buttons">
+                  <button class="reaction-btn" data-emoji="good">
+                    <img src="/images/good.png" alt="Good" style="width: 24px; height: 24px;">
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -243,34 +251,41 @@
       <!-- Results Screen -->
       <div id="results-screen" class="screen">
         <div class="container">
-          <h2 class="phase-title">ラウンド結果</h2>
+          <div class="results-header-container">
+            <div id="result-head-human" class="result-head-score human-score-box">
+              <span class="score-label">人間チーム</span>
+              <span class="score-num">0点</span>
+            </div>
+            <h2 class="phase-title">ラウンド結果</h2>
+            <div id="result-head-ai" class="result-head-score ai-score-box">
+              <span class="score-label">AI</span>
+              <span class="score-num">0点</span>
+            </div>
+          </div>
 
           <div class="results-content">
-            <div class="winner-banner" id="winner-banner">
+            <div class="winner-banner" id="winner-banner" style="opacity: 0;">
               <div class="winner-icon">🏆</div>
               <div class="winner-text" id="winner-text">人間チームの勝利!</div>
             </div>
+            
+            <div id="correct-answer" class="correct-answer">正解: ---</div>
 
             <div class="results-grid">
               <div class="card">
-                <h3>正解</h3>
-                <div class="correct-answer" id="correct-answer">cat</div>
-              </div>
-
-              <div class="card">
-                <h3>人間の回答</h3>
+                <h3>みんなの回答</h3>
                 <div id="human-guesses" class="guess-results"></div>
               </div>
 
+              <div class="card result-drawing-card">
+                <h3>描かれた絵</h3>
+                <div id="result-drawing-container" class="result-drawing-container"></div>
+              </div>
+              
               <div class="card">
-                <h3>AIの予測 (トップ3)</h3>
+                <h3>AIの予想</h3>
                 <div id="ai-predictions" class="ai-results"></div>
               </div>
-            </div>
-
-            <div class="card">
-              <h3>現在のスコア</h3>
-              <div id="results-score-list" class="score-list"></div>
             </div>
           </div>
 
@@ -300,9 +315,39 @@
       </div>
     </div>
 
+    <!-- Reaction Display -->
+    <div class="reaction-display" id="reactionDisplay"></div>
+
+    <!-- Confirm Modal -->
+    <div id="confirmModal">
+      <div class="modal-content">
+        <div class="modal-title" id="modalTitle">確認</div>
+        <div class="modal-message" id="modalMessage">実行しますか?</div>
+        <div class="modal-buttons">
+          <button class="btn btn-secondary" id="modalCancel">キャンセル</button>
+          <button class="btn btn-primary" id="modalConfirm">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chat Box -->
+    <div id="chatBox" class="minimized">
+      <div id="chatHeader">
+        <span>💬 チャット</span>
+        <button id="chatToggle">▼</button>
+      </div>
+      <div id="chatMessages"></div>
+      <div class="chat-preview" id="chatPreview">新しいメッセージはありません</div>
+      <div id="chatInputArea">
+        <input type="text" id="chatInput" placeholder="メッセージを入力..." />
+        <button id="chatSendBtn">送信</button>
+      </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/canvas.js"></script>
     <script src="/js/ui.js"></script>
     <script src="/js/client.js"></script>
+    <script src="/js/chat.js"></script>
   </body>
 </html>

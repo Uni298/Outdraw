@@ -1,4 +1,5 @@
 const socket = io();
+window.socket = socket; // Expose socket for chat.js
 const ui = new UIManager();
 let drawingCanvas = null;
 let guessCanvas = null;
@@ -6,6 +7,85 @@ let currentGameState = null;
 let timerInterval = null;
 let categories = [];
 let selectedCategory = null;
+
+// Modal confirmation
+let modalResolve = null;
+function showModal(title, message) {
+  return new Promise((resolve) => {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalMessage').textContent = message;
+    document.getElementById('confirmModal').classList.add('active');
+    modalResolve = resolve;
+  });
+}
+
+document.getElementById('modalConfirm').onclick = () => {
+  document.getElementById('confirmModal').classList.remove('active');
+  if (modalResolve) modalResolve(true);
+};
+
+document.getElementById('modalCancel').onclick = () => {
+  document.getElementById('confirmModal').classList.remove('active');
+  if (modalResolve) modalResolve(false);
+};
+
+// Reaction system
+function sendReaction(emoji) {
+  if (window.socket && window.socket.connected && ui.roomId) {
+    window.socket.emit('reaction', { roomId: ui.roomId, emoji });
+  }
+}
+
+function showReaction(emoji, playerId) {
+  const display = document.getElementById('reactionDisplay');
+  const chatBox = document.getElementById('chatBox');
+  
+  if (!chatBox) return;
+  
+  const rect = chatBox.getBoundingClientRect();
+  const emojiEl = document.createElement('div');
+  emojiEl.className = 'reaction-emoji pop-fade';
+  
+  // Use image for good reaction
+  if (emoji === 'good') {
+    const img = document.createElement('img');
+    img.src = '/images/good.png';
+    img.alt = 'Good';
+    emojiEl.appendChild(img);
+  } else {
+    emojiEl.textContent = emoji;
+  }
+  
+  // Position around chat box (random offset)
+  // Chat is bottom-right mostly
+  const randomX = Math.random() * 100 - 50; // +/- 50px
+  const randomY = Math.random() * 100 - 150; // -50 to -150px (above chat)
+  
+  emojiEl.style.left = `${rect.left + rect.width / 2 + randomX}px`;
+  emojiEl.style.top = `${rect.top + randomY}px`;
+  
+  display.appendChild(emojiEl);
+  setTimeout(() => emojiEl.remove(), 2000);
+}
+
+if (window.socket) {
+  window.socket.on('reaction', (data) => {
+    showReaction(data.emoji, data.playerId);
+  });
+
+  // Drawing events
+  window.socket.on('stroke-added', (stroke) => {
+    if (drawingCanvas) {
+      drawingCanvas.drawStroke(stroke);
+    }
+  });
+
+  window.socket.on('canvas-cleared', () => {
+    if (drawingCanvas) {
+      drawingCanvas.clear();
+    }
+  });
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -135,6 +215,11 @@ function initializeEventListeners() {
   document.getElementById('new-game-btn').onclick = () => {
     location.reload();
   };
+
+  // Reaction buttons
+  document.querySelectorAll('.reaction-btn').forEach(btn => {
+    btn.onclick = () => sendReaction(btn.dataset.emoji);
+  });
 }
 
 // Socket event handlers
@@ -145,6 +230,9 @@ socket.on('room-created', (data) => {
 
   document.getElementById('room-code-display').textContent = data.roomId;
   ui.showScreen('room-screen');
+
+  // Update settings visibility
+  updateSettingsVisibility(true);
 });
 
 socket.on('room-joined', (data) => {
@@ -261,20 +349,27 @@ function handleDrawing(state) {
   // Start timer
   startTimer('drawing-timer', state.timeRemaining);
 
+  const drawingTools = document.getElementById('drawing-tools');
+  const reactionCard = document.getElementById('reaction-card');
+
   if (state.currentDrawer === ui.playerId) {
     // This player is drawing
     document.getElementById('current-category').textContent = state.currentCategory;
     document.getElementById('spectator-message').classList.add('hidden');
     document.getElementById('drawing-canvas').parentElement.style.display = 'block';
     drawingCanvas.enable();
+    drawingTools.style.display = 'flex';
+    reactionCard.style.display = 'none';
   } else {
-    // Spectating
+    // Spectating - show reactions
     const drawer = state.players.find(p => p.id === state.currentDrawer);
     document.getElementById('drawer-name').textContent = drawer ? drawer.name : 'プレイヤー';
     document.getElementById('current-category').textContent = '???';
     document.getElementById('spectator-message').classList.remove('hidden');
     document.getElementById('drawing-canvas').parentElement.style.display = 'block';
     drawingCanvas.disable();
+    drawingTools.style.display = 'none';
+    reactionCard.style.display = 'block';
   }
 }
 
@@ -315,6 +410,13 @@ function handleGuessing(state) {
 function handleResults(state) {
   // UI update handled by ui.update()
   stopTimer();
+  
+  // Animate winner reveal
+  setTimeout(() => {
+    const banner = document.getElementById('winner-banner');
+    banner.style.opacity = '1';
+    banner.classList.add('reveal');
+  }, 100);
 }
 
 function handleFinished(state) {
@@ -389,8 +491,9 @@ function joinRoom() {
   });
 }
 
-function leaveRoom() {
-  if (confirm('本当に退出しますか?')) {
+async function leaveRoom() {
+  const confirmed = await showModal('退出確認', '本当に退出しますか?');
+  if (confirmed) {
     location.reload();
   }
 }
@@ -416,8 +519,9 @@ function startGame() {
   socket.emit('start-game', ui.roomId);
 }
 
-function endDrawing() {
-  if (confirm('描画を終了しますか?')) {
+async function endDrawing() {
+  const confirmed = await showModal('描画終了', '描画を終了しますか?');
+  if (confirmed) {
     socket.emit('end-drawing', ui.roomId);
   }
 }
@@ -445,4 +549,23 @@ window.selectCategory = selectCategory;
 
 function nextRound() {
   socket.emit('next-round', ui.roomId);
+}
+
+// Settings visibility
+function updateSettingsVisibility(isHost) {
+  const inputs = document.querySelectorAll('#settings-card input, #settings-card select');
+  const updateBtn = document.getElementById('update-settings-btn');
+  const hostBadge = document.getElementById('host-only-badge');
+  
+  inputs.forEach(input => {
+    input.disabled = !isHost;
+  });
+  
+  if (isHost) {
+    updateBtn.style.display = 'block';
+    hostBadge.classList.remove('hidden');
+  } else {
+    updateBtn.style.display = 'none';
+    hostBadge.classList.add('hidden');
+  }
 }

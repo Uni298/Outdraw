@@ -1,585 +1,843 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuickDraw CNN Demo</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QuickDraw CNN Demo</title>
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #ffffff;
-      color: #000000;
-      padding: 40px 20px;
-      min-height: 100vh;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-    }
-
-    h1 {
-      font-size: 32px;
-      font-weight: 600;
-      margin-bottom: 8px;
-      color: #000000;
-    }
-
-    .subtitle {
-      font-size: 14px;
-      color: #666666;
-      margin-bottom: 40px;
-    }
-
-    #loadingScreen {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-
-    #loadingScreen.hidden {
-      display: none;
-    }
-
-    .loading-content {
-      text-align: center;
-      max-width: 400px;
-      padding: 20px;
-    }
-
-    .loading-title {
-      font-size: 18px;
-      font-weight: 600;
-      margin-bottom: 20px;
-      color: #000000;
-    }
-
-    .progress-bar {
-      width: 100%;
-      height: 4px;
-      background: #e0e0e0;
-      margin-bottom: 12px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: #000000;
-      width: 0%;
-      transition: width 0.3s ease;
-    }
-
-    .loading-text {
-      font-size: 13px;
-      color: #666666;
-    }
-
-    #canvasWrapper {
-      border: 2px solid #000000;
-      display: inline-block;
-      background: #ffffff;
-      margin-bottom: 20px;
-    }
-
-    canvas {
-      background: #ffffff;
-      cursor: crosshair;
-      display: block;
-    }
-
-    .controls {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 40px;
-    }
-
-    button {
-      padding: 12px 24px;
-      font-size: 14px;
-      font-weight: 500;
-      background: #000000;
-      color: #ffffff;
-      border: 2px solid #000000;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-family: inherit;
-    }
-
-    button:hover {
-      background: #ffffff;
-      color: #000000;
-    }
-
-    button:active {
-      transform: translateY(1px);
-    }
-
-    button:disabled {
-      background: #e0e0e0;
-      color: #999999;
-      border-color: #e0e0e0;
-      cursor: not-allowed;
-    }
-
-    button:disabled:hover {
-      background: #e0e0e0;
-      color: #999999;
-    }
-
-    #results {
-      border-top: 2px solid #000000;
-      padding-top: 30px;
-    }
-
-    h2 {
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 20px;
-      color: #000000;
-    }
-
-    #output {
-      font-size: 14px;
-      line-height: 1.6;
-    }
-
-    .result-main {
-      font-size: 16px;
-      margin-bottom: 8px;
-      font-weight: 600;
-      color: #000000;
-    }
-
-    .result-score {
-      font-size: 13px;
-      color: #666666;
-      margin-bottom: 20px;
-    }
-
-    .top-predictions {
-      margin-top: 20px;
-      padding-top: 20px;
-      border-top: 1px solid #e0e0e0;
-    }
-
-    .top-predictions-title {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 12px;
-      color: #000000;
-    }
-
-    .prediction {
-      padding: 8px 0;
-      font-size: 13px;
-      color: #333333;
-      border-bottom: 1px solid #f0f0f0;
-    }
-
-    .prediction:last-child {
-      border-bottom: none;
-    }
-
-    .prediction-rank {
-      display: inline-block;
-      width: 30px;
-      color: #999999;
-    }
-
-    .prediction-name {
-      font-weight: 500;
-      color: #000000;
-    }
-
-    .prediction-score {
-      color: #666666;
-      float: right;
-    }
-
-    .error {
-      color: #cc0000;
-      padding: 12px;
-      border: 1px solid #cc0000;
-      background: #fff5f5;
-      margin-top: 12px;
-    }
-
-    @media (max-width: 600px) {
       body {
-        padding: 20px 16px;
+        font-family:
+          "Comic Sans MS", "Chalkboard SE", "Comic Neue", cursive, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: #ffffff;
+        padding: 15px 10px;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
       }
 
       h1 {
-        font-size: 24px;
+        font-size: 36px;
+        font-weight: 700;
+        margin-bottom: 4px;
+        color: #ffeb3b;
+        text-shadow:
+          3px 3px 0px #ff4081,
+          5px 5px 0px #7c4dff;
+        letter-spacing: 2px;
+      }
+
+      .subtitle {
+        font-size: 15px;
+        color: #ffd54f;
+        margin-bottom: 15px;
+        font-weight: 600;
+      }
+
+      #loadingScreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+
+      #loadingScreen.hidden {
+        display: none;
+      }
+
+      .loading-content {
+        text-align: center;
+        max-width: 400px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        border: 3px solid #ffeb3b;
+      }
+
+      .loading-title {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: #ffeb3b;
+      }
+
+      .progress-bar {
+        width: 100%;
+        height: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        margin-bottom: 10px;
+        overflow: hidden;
+        border-radius: 10px;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #ff4081, #ffeb3b, #00e676);
+        width: 0%;
+        transition: width 0.3s ease;
+        border-radius: 10px;
+      }
+
+      .loading-text {
+        font-size: 14px;
+        color: #ffffff;
+        font-weight: 600;
       }
 
       #canvasWrapper {
-        width: 100%;
+        border: 5px solid #ff4081;
+        display: inline-block;
+        background: #ffffff;
+        margin-bottom: 12px;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
       }
 
       canvas {
-        width: 100%;
-        height: auto;
+        background: #ffffff;
+        cursor: crosshair;
+        display: block;
       }
-    }
-  </style>
-</head>
 
-<body>
-  <div id="loadingScreen">
-    <div class="loading-content">
-      <div class="loading-title">モデルを読み込んでいます...</div>
-      <div class="progress-bar">
-        <div class="progress-fill" id="progressFill"></div>
+      .controls {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 15px;
+      }
+
+      button {
+        padding: 10px 20px;
+        font-size: 16px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #ff4081, #f50057);
+        color: #ffffff;
+        border: 3px solid #ffffff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-family: inherit;
+        border-radius: 25px;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+        text-transform: uppercase;
+      }
+
+      button:hover {
+        background: linear-gradient(135deg, #7c4dff, #536dfe);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.4);
+      }
+
+      button:active {
+        transform: translateY(1px);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+      }
+
+      button:disabled {
+        background: #9e9e9e;
+        color: #e0e0e0;
+        border-color: #757575;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      button:disabled:hover {
+        background: #9e9e9e;
+        transform: none;
+      }
+
+      #results {
+        border-top: 3px solid #ffeb3b;
+        padding-top: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 15px;
+        padding: 15px;
+        margin-top: 10px;
+      }
+
+      h2 {
+        font-size: 24px;
+        font-weight: 700;
+        margin-bottom: 10px;
+        color: #ffeb3b;
+        text-shadow: 2px 2px 0px #ff4081;
+      }
+
+      #output {
+        font-size: 15px;
+        line-height: 1.4;
+      }
+
+      .result-main {
+        font-size: 18px;
+        margin-bottom: 5px;
+        font-weight: 700;
+        color: #00e676;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+      }
+
+      .result-score {
+        font-size: 14px;
+        color: #ffd54f;
+        margin-bottom: 10px;
+        font-weight: 600;
+      }
+
+      .top-predictions {
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 2px solid rgba(255, 255, 255, 0.3);
+      }
+
+      .top-predictions-title {
+        font-size: 16px;
+        font-weight: 700;
+        margin-bottom: 8px;
+        color: #ffeb3b;
+      }
+
+      .prediction {
+        padding: 5px 8px;
+        font-size: 14px;
+        color: #ffffff;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.05);
+        margin-bottom: 3px;
+        border-radius: 8px;
+      }
+
+      .prediction:last-child {
+        border-bottom: none;
+      }
+
+      .prediction-rank {
+        display: inline-block;
+        width: 30px;
+        color: #ff4081;
+        font-weight: 700;
+      }
+
+      .prediction-name {
+        font-weight: 600;
+        color: #ffffff;
+      }
+
+      .prediction-score {
+        color: #ffd54f;
+        float: right;
+        font-weight: 600;
+      }
+
+      .error {
+        color: #ff1744;
+        padding: 10px;
+        border: 2px solid #ff1744;
+        background: rgba(255, 23, 68, 0.2);
+        margin-top: 8px;
+        border-radius: 10px;
+        font-weight: 600;
+      }
+
+      /* Chat Box Styles */
+      #chatBox {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 320px;
+        height: 400px;
+        background: linear-gradient(135deg, #7c4dff, #536dfe);
+        border: 4px solid #ffeb3b;
+        border-radius: 20px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        z-index: 999;
+      }
+
+      #chatHeader {
+        background: linear-gradient(135deg, #ff4081, #f50057);
+        color: #ffffff;
+        padding: 10px 15px;
+        font-weight: 700;
+        font-size: 18px;
+        text-align: center;
+        border-bottom: 3px solid #ffeb3b;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+      }
+
+      #chatMessages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      .chat-message {
+        margin-bottom: 8px;
+        padding: 8px 12px;
+        border-radius: 15px;
+        font-size: 13px;
+        line-height: 1.4;
+        word-wrap: break-word;
+        animation: slideIn 0.3s ease;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .chat-message.user {
+        background: linear-gradient(135deg, #00e676, #00c853);
+        color: #ffffff;
+        margin-left: 20px;
+        text-align: right;
+        font-weight: 600;
+      }
+
+      .chat-message.other {
+        background: rgba(255, 255, 255, 0.9);
+        color: #333333;
+        margin-right: 20px;
+        font-weight: 600;
+      }
+
+      .chat-message .username {
+        font-weight: 700;
+        font-size: 11px;
+        margin-bottom: 3px;
+        opacity: 0.8;
+      }
+
+      #chatInputArea {
+        display: flex;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.3);
+        border-top: 3px solid #ffeb3b;
+        gap: 5px;
+      }
+
+      #chatInput {
+        flex: 1;
+        padding: 8px 12px;
+        border: 2px solid #ffffff;
+        border-radius: 20px;
+        font-size: 14px;
+        font-family: inherit;
+        background: #ffffff;
+        color: #333333;
+        font-weight: 600;
+      }
+
+      #chatInput:focus {
+        outline: none;
+        border-color: #ffeb3b;
+        box-shadow: 0 0 10px rgba(255, 235, 59, 0.5);
+      }
+
+      #chatSendBtn {
+        padding: 8px 16px;
+        background: linear-gradient(135deg, #ffeb3b, #ffc107);
+        color: #333333;
+        border: 2px solid #ffffff;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: 700;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+      }
+
+      #chatSendBtn:hover {
+        background: linear-gradient(135deg, #00e676, #00c853);
+        color: #ffffff;
+        transform: scale(1.05);
+      }
+
+      #chatSendBtn:active {
+        transform: scale(0.95);
+      }
+
+      @media (max-width: 600px) {
+        body {
+          padding: 10px 8px;
+        }
+
+        h1 {
+          font-size: 28px;
+        }
+
+        #canvasWrapper {
+          width: 100%;
+        }
+
+        canvas {
+          width: 100%;
+          height: auto;
+        }
+
+        #chatBox {
+          width: 280px;
+          height: 350px;
+          bottom: 10px;
+          right: 10px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="loadingScreen">
+      <div class="loading-content">
+        <div class="loading-title">モデルを読み込んでいます...</div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="loading-text" id="loadingText">準備中...</div>
       </div>
-      <div class="loading-text" id="loadingText">準備中...</div>
-    </div>
-  </div>
-
-  <div class="container">
-    <h1>QuickDraw CNN Demo</h1>
-    <div class="subtitle">キャンバスに絵を描いて、AIに何を描いたか当ててもらいましょう</div>
-
-    <div id="canvasWrapper">
-      <canvas id="draw" width="400" height="400"></canvas>
     </div>
 
-    <div class="controls">
-      <button id="clearBtn">クリア</button>
-      <button id="predictBtn">予測する</button>
+    <div class="container">
+      <h1>QuickDraw CNN Demo</h1>
+      <div class="subtitle">
+        キャンバスに絵を描いて、AIに何を描いたか当ててもらいましょう
+      </div>
+
+      <div id="canvasWrapper">
+        <canvas id="draw" width="400" height="400"></canvas>
+      </div>
+
+      <div class="controls">
+        <button id="clearBtn">クリア</button>
+        <button id="predictBtn">予測する</button>
+      </div>
+
+      <div id="results">
+        <h2>予測結果</h2>
+        <div id="output">
+          キャンバスに何か描いて「予測する」ボタンを押してください
+        </div>
+      </div>
     </div>
 
-    <div id="results">
-      <h2>予測結果</h2>
-      <div id="output">キャンバスに何か描いて「予測する」ボタンを押してください</div>
+  <!-- Chat Box -->
+  <div id="chatBox">
+    <div id="chatHeader">💬 チャット</div>
+    <div id="chatMessages"></div>
+    <div id="chatInputArea">
+      <input type="text" id="chatInput" placeholder="メッセージを入力..." />
+      <button id="chatSendBtn">送信</button>
     </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
-  <script>
-    // グローバル変数
-    let session = null;
-    let modelNames = [];
-    const canvas = document.getElementById('draw');
-    const ctx = canvas.getContext('2d');
-    const clearBtn = document.getElementById('clearBtn');
-    const predictBtn = document.getElementById('predictBtn');
-    const output = document.getElementById('output');
-    const loadingScreen = document.getElementById('loadingScreen');
-    const progressFill = document.getElementById('progressFill');
-    const loadingText = document.getElementById('loadingText');
+    <script>
+      // グローバル変数
+      let session = null;
+      let modelNames = [];
+      const canvas = document.getElementById("draw");
+      const ctx = canvas.getContext("2d");
+      const clearBtn = document.getElementById("clearBtn");
+      const predictBtn = document.getElementById("predictBtn");
+      const output = document.getElementById("output");
+      const loadingScreen = document.getElementById("loadingScreen");
+      const progressFill = document.getElementById("progressFill");
+      const loadingText = document.getElementById("loadingText");
 
-    // 描画設定
-    ctx.lineWidth = 12;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#000000';
+      // 描画設定
+      ctx.lineWidth = 12;
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#000000";
 
-    let drawing = false;
-    let currentStroke = null;
-    let strokes = [];
+      let drawing = false;
+      let currentStroke = null;
+      let strokes = [];
 
-    // ===== モデル読み込み =====
-    async function loadModel() {
-      try {
-        // カテゴリ読み込み
-        progressFill.style.width = '20%';
-        loadingText.textContent = 'カテゴリを読み込んでいます...';
+      // ===== モデル読み込み =====
+      async function loadModel() {
+        try {
+          // カテゴリ読み込み
+          progressFill.style.width = "20%";
+          loadingText.textContent = "カテゴリを読み込んでいます...";
 
-        const categoriesUrl = 'https://raw.githubusercontent.com/Uni298/Outdraw/refs/heads/main/categories.txt';
-        const catResponse = await fetch(categoriesUrl);
-        const catText = await catResponse.text();
-        modelNames = catText.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
-        console.log(`カテゴリ読み込み完了: ${modelNames.length}個`);
+          const categoriesUrl =
+            "https://raw.githubusercontent.com/Uni298/Outdraw/refs/heads/main/categories.txt";
+          const catResponse = await fetch(categoriesUrl);
+          const catText = await catResponse.text();
+          modelNames = catText
+            .split(/\r?\n/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+          console.log(`カテゴリ読み込み完了: ${modelNames.length}個`);
 
-        // ONNXモデル本体と外部データを取得
-        progressFill.style.width = '40%';
-        loadingText.textContent = 'ONNXモデルをダウンロードしています...';
+          // ONNXモデル本体と外部データを取得
+          progressFill.style.width = "40%";
+          loadingText.textContent = "ONNXモデルをダウンロードしています...";
 
-        const modelUrl = 'https://raw.githubusercontent.com/Uni298/Outdraw/main/png_model_32/model.onnx';
-        const dataUrl = modelUrl + '.data'; // 同じディレクトリにある外部データ
+          const modelUrl =
+            "https://raw.githubusercontent.com/Uni298/Outdraw/main/png_model_32/model.onnx";
+          const dataUrl = modelUrl + ".data"; // 同じディレクトリにある外部データ
 
-        // 並列で取得し、どちらかが失敗してもエラーハンドリングできるように個別にチェック
-        const [modelResp, dataResp] = await Promise.all([
-          fetch(modelUrl),
-          fetch(dataUrl).catch(() => null) // .data が無い場合は null を許容
+          // 並列で取得し、どちらかが失敗してもエラーハンドリングできるように個別にチェック
+          const [modelResp, dataResp] = await Promise.all([
+            fetch(modelUrl),
+            fetch(dataUrl).catch(() => null), // .data が無い場合は null を許容
+          ]);
+
+          if (!modelResp.ok) {
+            throw new Error(
+              `モデルのダウンロードに失敗しました: ${modelResp.status}`,
+            );
+          }
+          const modelBuffer = await modelResp.arrayBuffer();
+
+          // .data が存在すれば取得して保持（実際の推論に必要な場合は ort が自動で参照）
+          let modelDataBuffer = null;
+          if (dataResp && dataResp.ok) {
+            modelDataBuffer = await dataResp.arrayBuffer();
+            console.log(
+              "外部データ (model.onnx.data) を取得しました。サイズ:",
+              modelDataBuffer.byteLength,
+            );
+          } else {
+            console.warn(
+              "外部データ (model.onnx.data) が見つかりませんでした。モデルが埋め込みデータのみの場合は問題ありません。",
+            );
+          }
+
+          progressFill.style.width = "70%";
+          loadingText.textContent = "モデルデータを処理しています...";
+
+          // ort.InferenceSession.create は ArrayBuffer を受け取ります。
+          // 外部データが必要な場合は同じバッファに結合する必要はなく、
+          // Web 環境では内部で fetch して取得できるのでそのまま渡します。
+          session = await ort.InferenceSession.create(modelBuffer);
+
+          progressFill.style.width = "100%";
+          loadingText.textContent = "完了!";
+          console.log("ONNXモデル読み込み完了");
+
+          setTimeout(() => {
+            loadingScreen.classList.add("hidden");
+          }, 500);
+        } catch (err) {
+          console.error("モデル読み込みエラー:", err);
+          loadingText.textContent = "エラーが発生しました: " + err.message;
+          loadingText.style.color = "#cc0000";
+        }
+      }
+
+      // ===== 描画関数 =====
+      function drawLine(grid, x0, y0, x1, y1, size) {
+        let dx = Math.abs(x1 - x0);
+        let dy = Math.abs(y1 - y0);
+        let sx = x0 < x1 ? 1 : -1;
+        let sy = y0 < y1 ? 1 : -1;
+        let err = dx - dy;
+
+        while (true) {
+          if (x0 >= 0 && x0 < size && y0 >= 0 && y0 < size) {
+            grid[y0][x0] = 0;
+          }
+          if (x0 === x1 && y0 === y1) break;
+          let e2 = 2 * err;
+          if (e2 > -dy) {
+            err -= dy;
+            x0 += sx;
+          }
+          if (e2 < dx) {
+            err += dx;
+            y0 += sy;
+          }
+        }
+      }
+
+      function normalizeStrokes(strokes, size = 32) {
+        let xs = [];
+        let ys = [];
+
+        for (const stroke of strokes) {
+          xs.push(...stroke[0]);
+          ys.push(...stroke[1]);
+        }
+
+        if (xs.length === 0 || ys.length === 0) return [];
+
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+
+        const w = maxX - minX + 1e-5;
+        const h = maxY - minY + 1e-5;
+
+        const normalized = strokes.map((stroke) => [
+          stroke[0].map((x) => Math.floor(((x - minX) / w) * (size - 1))),
+          stroke[1].map((y) => Math.floor(((y - minY) / h) * (size - 1))),
         ]);
 
-        if (!modelResp.ok) {
-          throw new Error(`モデルのダウンロードに失敗しました: ${modelResp.status}`);
+        return normalized;
+      }
+
+      function rasterizeStrokes(strokes, size = 32) {
+        const normalizedStrokes = normalizeStrokes(strokes, size);
+        const grid = Array(size)
+          .fill()
+          .map(() => Array(size).fill(255));
+
+        for (const stroke of normalizedStrokes) {
+          const xs = stroke[0];
+          const ys = stroke[1];
+          for (let i = 0; i < xs.length - 1; i++) {
+            drawLine(grid, xs[i], ys[i], xs[i + 1], ys[i + 1], size);
+          }
         }
-        const modelBuffer = await modelResp.arrayBuffer();
 
-        // .data が存在すれば取得して保持（実際の推論に必要な場合は ort が自動で参照）
-        let modelDataBuffer = null;
-        if (dataResp && dataResp.ok) {
-          modelDataBuffer = await dataResp.arrayBuffer();
-          console.log('外部データ (model.onnx.data) を取得しました。サイズ:', modelDataBuffer.byteLength);
-        } else {
-          console.warn('外部データ (model.onnx.data) が見つかりませんでした。モデルが埋め込みデータのみの場合は問題ありません。');
+        const data = [];
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            data.push(1.0 - grid[y][x] / 255.0);
+          }
+        }
+        return data;
+      }
+
+      // ===== 予測関数 =====
+      async function predictStrokes(strokes, options = {}) {
+        if (!session) {
+          throw new Error("モデルが読み込まれていません");
         }
 
-        progressFill.style.width = '70%';
-        loadingText.textContent = 'モデルデータを処理しています...';
+        const size = 32;
+        const topNCount = options.topN || 10;
 
-        // ort.InferenceSession.create は ArrayBuffer を受け取ります。
-        // 外部データが必要な場合は同じバッファに結合する必要はなく、
-        // Web 環境では内部で fetch して取得できるのでそのまま渡します。
-        session = await ort.InferenceSession.create(modelBuffer);
+        const imgArray = rasterizeStrokes(strokes, size);
+        const inputTensor = new ort.Tensor(
+          "float32",
+          Float32Array.from(imgArray),
+          [1, 1, size, size],
+        );
 
-        progressFill.style.width = '100%';
-        loadingText.textContent = '完了!';
-        console.log('ONNXモデル読み込み完了');
+        const results = await session.run({ input: inputTensor });
+        const logits = results.logits.data;
 
-        setTimeout(() => {
-          loadingScreen.classList.add('hidden');
-        }, 500);
-      } catch (err) {
-        console.error('モデル読み込みエラー:', err);
-        loadingText.textContent = 'エラーが発生しました: ' + err.message;
-        loadingText.style.color = '#cc0000';
-      }
-    }
-
-    // ===== 描画関数 =====
-    function drawLine(grid, x0, y0, x1, y1, size) {
-      let dx = Math.abs(x1 - x0);
-      let dy = Math.abs(y1 - y0);
-      let sx = (x0 < x1) ? 1 : -1;
-      let sy = (y0 < y1) ? 1 : -1;
-      let err = dx - dy;
-
-      while (true) {
-        if (x0 >= 0 && x0 < size && y0 >= 0 && y0 < size) {
-          grid[y0][x0] = 0;
+        const numClasses = logits.length;
+        const scored = [];
+        for (let i = 0; i < numClasses; i++) {
+          scored.push({
+            index: i,
+            score: logits[i],
+            name: modelNames[i] || `class_${i}`,
+          });
         }
-        if (x0 === x1 && y0 === y1) break;
-        let e2 = 2 * err;
-        if (e2 > -dy) {
-          err -= dy;
-          x0 += sx;
+
+        scored.sort((a, b) => b.score - a.score);
+
+        const topN = scored.slice(0, topNCount);
+        const best = scored[0];
+
+        return {
+          classIndex: best.index,
+          className: best.name,
+          score: best.score,
+          topN: topN,
+        };
+      }
+
+      // ===== キャンバス操作 =====
+      function getCanvasPos(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        const x = ((e.clientX || e.touches[0].clientX) - rect.left) * scaleX;
+        const y = ((e.clientY || e.touches[0].clientY) - rect.top) * scaleY;
+        return { x, y };
+      }
+
+      function startDraw(e) {
+        e.preventDefault();
+        drawing = true;
+        const pos = getCanvasPos(e);
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y);
+
+        currentStroke = [[], []];
+        currentStroke[0].push(pos.x);
+        currentStroke[1].push(pos.y);
+      }
+
+      function moveDraw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        const pos = getCanvasPos(e);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.stroke();
+
+        currentStroke[0].push(pos.x);
+        currentStroke[1].push(pos.y);
+      }
+
+      function endDraw(e) {
+        if (!drawing) return;
+        e.preventDefault();
+        drawing = false;
+        if (currentStroke && currentStroke[0].length > 0) {
+          strokes.push(currentStroke);
         }
-        if (e2 < dx) {
-          err += dx;
-          y0 += sy;
-        }
-      }
-    }
-
-    function normalizeStrokes(strokes, size = 32) {
-      let xs = [];
-      let ys = [];
-
-      for (const stroke of strokes) {
-        xs.push(...stroke[0]);
-        ys.push(...stroke[1]);
+        currentStroke = null;
       }
 
-      if (xs.length === 0 || ys.length === 0) return [];
+      // イベントリスナー
+      canvas.addEventListener("mousedown", startDraw);
+      canvas.addEventListener("mousemove", moveDraw);
+      canvas.addEventListener("mouseup", endDraw);
+      canvas.addEventListener("mouseleave", endDraw);
 
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
+      canvas.addEventListener("touchstart", startDraw);
+      canvas.addEventListener("touchmove", moveDraw);
+      canvas.addEventListener("touchend", endDraw);
+      canvas.addEventListener("touchcancel", endDraw);
 
-      const w = (maxX - minX) + 1e-5;
-      const h = (maxY - minY) + 1e-5;
+      // クリアボタン
+      clearBtn.addEventListener("click", () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        strokes = [];
+        output.innerHTML =
+          "キャンバスに何か描いて「予測する」ボタンを押してください";
+      });
 
-      const normalized = strokes.map(stroke => [
-        stroke[0].map(x => Math.floor(((x - minX) / w) * (size - 1))),
-        stroke[1].map(y => Math.floor(((y - minY) / h) * (size - 1)))
-      ]);
-
-      return normalized;
-    }
-
-    function rasterizeStrokes(strokes, size = 32) {
-      const normalizedStrokes = normalizeStrokes(strokes, size);
-      const grid = Array(size).fill().map(() => Array(size).fill(255));
-
-      for (const stroke of normalizedStrokes) {
-        const xs = stroke[0];
-        const ys = stroke[1];
-        for (let i = 0; i < xs.length - 1; i++) {
-          drawLine(grid, xs[i], ys[i], xs[i + 1], ys[i + 1], size);
-        }
-      }
-
-      const data = [];
-      for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-          data.push(1.0 - (grid[y][x] / 255.0));
-        }
-      }
-      return data;
-    }
-
-    // ===== 予測関数 =====
-    async function predictStrokes(strokes, options = {}) {
-      if (!session) {
-        throw new Error("モデルが読み込まれていません");
-      }
-
-      const size = 32;
-      const topNCount = options.topN || 10;
-
-      const imgArray = rasterizeStrokes(strokes, size);
-      const inputTensor = new ort.Tensor(
-        'float32',
-        Float32Array.from(imgArray),
-        [1, 1, size, size]
-      );
-
-      const results = await session.run({ input: inputTensor });
-      const logits = results.logits.data;
-
-      const numClasses = logits.length;
-      const scored = [];
-      for (let i = 0; i < numClasses; i++) {
-        scored.push({
-          index: i,
-          score: logits[i],
-          name: modelNames[i] || `class_${i}`
-        });
-      }
-
-      scored.sort((a, b) => b.score - a.score);
-
-      const topN = scored.slice(0, topNCount);
-      const best = scored[0];
-
-      return {
-        classIndex: best.index,
-        className: best.name,
-        score: best.score,
-        topN: topN
-      };
-    }
-
-    // ===== キャンバス操作 =====
-    function getCanvasPos(e) {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = ((e.clientX || e.touches[0].clientX) - rect.left) * scaleX;
-      const y = ((e.clientY || e.touches[0].clientY) - rect.top) * scaleY;
-      return { x, y };
-    }
-
-    function startDraw(e) {
-      e.preventDefault();
-      drawing = true;
-      const pos = getCanvasPos(e);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-
-      currentStroke = [[], []];
-      currentStroke[0].push(pos.x);
-      currentStroke[1].push(pos.y);
-    }
-
-    function moveDraw(e) {
-      if (!drawing) return;
-      e.preventDefault();
-      const pos = getCanvasPos(e);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-
-      currentStroke[0].push(pos.x);
-      currentStroke[1].push(pos.y);
-    }
-
-    function endDraw(e) {
-      if (!drawing) return;
-      e.preventDefault();
-      drawing = false;
-      if (currentStroke && currentStroke[0].length > 0) {
-        strokes.push(currentStroke);
-      }
-      currentStroke = null;
-    }
-
-    // イベントリスナー
-    canvas.addEventListener('mousedown', startDraw);
-    canvas.addEventListener('mousemove', moveDraw);
-    canvas.addEventListener('mouseup', endDraw);
-    canvas.addEventListener('mouseleave', endDraw);
-
-    canvas.addEventListener('touchstart', startDraw);
-    canvas.addEventListener('touchmove', moveDraw);
-    canvas.addEventListener('touchend', endDraw);
-    canvas.addEventListener('touchcancel', endDraw);
-
-    // クリアボタン
-    clearBtn.addEventListener('click', () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ffffff';
+      // 初期背景
+      ctx.fillStyle = "#ffffff";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      strokes = [];
-      output.innerHTML = 'キャンバスに何か描いて「予測する」ボタンを押してください';
+
+      // 予測ボタン
+      predictBtn.addEventListener("click", async () => {
+        if (strokes.length === 0) {
+          output.innerHTML = '<div class="error">何か描いてください</div>';
+          return;
+        }
+
+        try {
+          output.innerHTML = "予測中...";
+          predictBtn.disabled = true;
+
+          const result = await predictStrokes(strokes, { topN: 10 });
+
+          let html = "";
+          html += `<div class="result-main">予測: <strong>${result.className}</strong></div>`;
+          html += `<div class="result-score">スコア: ${result.score.toFixed(3)}</div>`;
+
+          html += '<div class="top-predictions">';
+          html += '<div class="top-predictions-title">上位10件の予測</div>';
+
+          result.topN.forEach((item, idx) => {
+            html += `<div class="prediction">`;
+            html += `<span class="prediction-rank">#${idx + 1}</span>`;
+            html += `<span class="prediction-name">${item.name}</span>`;
+            html += `<span class="prediction-score">${item.score.toFixed(3)}</span>`;
+            html += `</div>`;
+          });
+
+          html += "</div>";
+
+          output.innerHTML = html;
+        } catch (err) {
+          console.error(err);
+          output.innerHTML =
+            '<div class="error">エラーが発生しました: ' +
+            err.message +
+            "</div>";
+        } finally {
+          predictBtn.disabled = false;
+        }
+      });
+
+    // ===== チャット機能 =====
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const chatSendBtn = document.getElementById('chatSendBtn');
+
+    // デモ用のユーザー名
+    const currentUser = 'あなた';
+
+    // メッセージを追加する関数
+    function addChatMessage(username, message, isCurrentUser = false) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `chat-message ${isCurrentUser ? 'user' : 'other'}`;
+      
+      if (!isCurrentUser) {
+        const usernameSpan = document.createElement('div');
+        usernameSpan.className = 'username';
+        usernameSpan.textContent = username;
+        messageDiv.appendChild(usernameSpan);
+      }
+      
+      const messageText = document.createElement('div');
+      messageText.textContent = message;
+      messageDiv.appendChild(messageText);
+      
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // メッセージ送信
+    function sendMessage() {
+      const message = chatInput.value.trim();
+      if (message === '') return;
+      
+      addChatMessage(currentUser, message, true);
+      chatInput.value = '';
+      
+      // デモ用: ランダムな自動返信
+      setTimeout(() => {
+        const responses = [
+          'すごい絵だね!',
+          'それは何を描いたの?',
+          'うまく描けてるね!',
+          'AIの予測は当たった?',
+          'もっと描いて見せて!'
+        ];
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+        addChatMessage('プレイヤー' + Math.floor(Math.random() * 100), randomResponse, false);
+      }, 1000 + Math.random() * 2000);
+    }
+
+    chatSendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
     });
 
-    // 初期背景
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // ウェルカムメッセージ
+    addChatMessage('システム', 'チャットへようこそ! 自由にメッセージを送ってね!', false);
 
-    // 予測ボタン
-    predictBtn.addEventListener('click', async () => {
-      if (strokes.length === 0) {
-        output.innerHTML = '<div class="error">何か描いてください</div>';
-        return;
-      }
-
-      try {
-        output.innerHTML = '予測中...';
-        predictBtn.disabled = true;
-
-        const result = await predictStrokes(strokes, { topN: 10 });
-
-        let html = '';
-        html += `<div class="result-main">予測: <strong>${result.className}</strong></div>`;
-        html += `<div class="result-score">スコア: ${result.score.toFixed(3)}</div>`;
-        
-        html += '<div class="top-predictions">';
-        html += '<div class="top-predictions-title">上位10件の予測</div>';
-        
-        result.topN.forEach((item, idx) => {
-          html += `<div class="prediction">`;
-          html += `<span class="prediction-rank">#${idx + 1}</span>`;
-          html += `<span class="prediction-name">${item.name}</span>`;
-          html += `<span class="prediction-score">${item.score.toFixed(3)}</span>`;
-          html += `</div>`;
-        });
-        
-        html += '</div>';
-
-        output.innerHTML = html;
-
-      } catch (err) {
-        console.error(err);
-        output.innerHTML = '<div class="error">エラーが発生しました: ' + err.message + '</div>';
-      } finally {
-        predictBtn.disabled = false;
-      }
-    });
-
-    // 起動時にモデル読み込み
-    loadModel();
-  </script>
-</body>
-
+      // 起動時にモデル読み込み
+      loadModel();
+    </script>
+  </body>
 </html>

@@ -68,38 +68,72 @@ class UIManager {
     });
   }
 
-  updateScoreList(players) {
+  updateScoreList(state) {
     const lists = [
       document.getElementById('score-list'),
       document.getElementById('results-score-list'),
       document.getElementById('final-score-list')
     ];
+    
+    // Calculate Human Team Score
+    const players = state.players || [];
+    const humanScore = players.reduce((sum, p) => sum + p.score, 0);
+    const aiScore = state.aiScore || 0;
 
     lists.forEach(list => {
       if (!list) return;
 
       list.innerHTML = '';
 
-      // Sort by score
-      const sorted = [...players].sort((a, b) => b.score - a.score);
-
-      sorted.forEach((player, index) => {
-        const item = document.createElement('div');
-        item.className = 'score-item';
-
-        const nameDiv = document.createElement('div');
-        nameDiv.className = 'score-name';
-        nameDiv.textContent = `${index + 1}. ${player.name}`;
-
-        const scoreDiv = document.createElement('div');
-        scoreDiv.className = 'score-value';
-        scoreDiv.textContent = `${player.score}点`;
-
-        item.appendChild(nameDiv);
-        item.appendChild(scoreDiv);
-        list.appendChild(item);
-      });
+      // Human Team Item
+      const humanItem = document.createElement('div');
+      humanItem.className = 'score-item';
+      humanItem.style.background = '#FF9446'; // Orange
+      humanItem.style.color = 'white';
+      
+      const humanName = document.createElement('div');
+      humanName.className = 'score-name';
+      humanName.textContent = '人間チーム';
+      
+      const humanValue = document.createElement('div');
+      humanValue.className = 'score-value';
+      humanValue.style.color = 'white';
+      humanValue.textContent = `${humanScore}点`;
+      
+      humanItem.appendChild(humanName);
+      humanItem.appendChild(humanValue);
+      list.appendChild(humanItem);
+      
+      // AI Team Item
+      const aiItem = document.createElement('div');
+      aiItem.className = 'score-item';
+      aiItem.style.background = '#330634'; // Dark Purple
+      aiItem.style.color = 'white';
+      
+      const aiName = document.createElement('div');
+      aiName.className = 'score-name';
+      aiName.textContent = 'AI';
+      
+      const aiValue = document.createElement('div');
+      aiValue.className = 'score-value';
+      aiValue.style.color = 'white';
+      aiValue.textContent = `${aiScore}点`;
+      
+      aiItem.appendChild(aiName);
+      aiItem.appendChild(aiValue);
+      list.appendChild(aiItem);
     });
+    
+    // Also update Header Scores in Results Screen
+    const humanHeadEl = document.getElementById('result-head-human');
+    const aiHeadEl = document.getElementById('result-head-ai');
+    
+    if (humanHeadEl) {
+      humanHeadEl.querySelector('.score-num').textContent = `${humanScore}点`;
+    }
+    if (aiHeadEl) {
+      aiHeadEl.querySelector('.score-num').textContent = `${aiScore}点`;
+    }
   }
 
   update(state, myPlayerId) {
@@ -108,7 +142,7 @@ class UIManager {
     // Players is already an array from server serialization
     const players = state.players;
     this.updatePlayerList(players, state.currentDrawer);
-    this.updateScoreList(players);
+    this.updateScoreList(state);
 
     // Update host controls based on current state
     const me = players.find(p => p.id === myPlayerId);
@@ -303,40 +337,83 @@ class UIManager {
 
       item.innerHTML = `
         <span><span class="ai-rank">${index + 1}位:</span> ${pred.name}</span>
-        <span style="font-size: 0.85rem; color: #7F8C8D;">距離: ${pred.distance.toFixed(2)}</span>
       `;
 
       aiPredictions.appendChild(item);
     });
 
-    // Visualize AI Input Debug
-    if (results.aiInputDebug && results.aiInputDebug.length === 1024) {
-      let debugContainer = document.getElementById('ai-debug-container');
-      if (!debugContainer) {
-        debugContainer = document.createElement('div');
-        debugContainer.id = 'ai-debug-container';
-        debugContainer.style.marginTop = '10px';
-        debugContainer.innerHTML = '<h4>AIが見た画像 (32x32)</h4><canvas id="ai-debug-canvas" width="64" height="64" style="border:1px solid #ccc; image-rendering: pixelated;"></canvas>';
-        document.getElementById('ai-predictions').parentNode.appendChild(debugContainer);
-      }
-
-      const canvas = document.getElementById('ai-debug-canvas');
-      if (canvas) {
-        const ctx = canvas.getContext('2d');
-        ctx.clearRect(0, 0, 64, 64);
-        // Draw 32x32 data scaled to 64x64
-        const data = results.aiInputDebug;
-        for (let y = 0; y < 32; y++) {
-          for (let x = 0; x < 32; x++) {
-            const val = data[y * 32 + x]; // 0.0-1.0 (Blackness)
-            // Invert back to grayscale color (0=Black, 1=White for display? No, 1.0 is Blackness. So 0 is White.)
-            // val=1.0 -> Black (0). val=0.0 -> White (255).
-            const color = Math.floor((1.0 - val) * 255);
-            ctx.fillStyle = `rgb(${color},${color},${color})`;
-            ctx.fillRect(x * 2, y * 2, 2, 2);
+    // Show drawing
+    const drawingContainer = document.getElementById('result-drawing-container');
+    if (drawingContainer && results.drawing) {
+      drawingContainer.innerHTML = '';
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 600;
+      
+      // Calculate bounds to center and scale
+      let minX = 800, maxX = 0, minY = 600, maxY = 0;
+      let hasPoints = false;
+      
+      if (results.drawing && results.drawing.length > 0) {
+        results.drawing.forEach(stroke => {
+          if (stroke.points && stroke.points.length > 0) {
+            stroke.points.forEach(p => {
+              if (p.x < minX) minX = p.x;
+              if (p.x > maxX) maxX = p.x;
+              if (p.y < minY) minY = p.y;
+              if (p.y > maxY) maxY = p.y;
+              hasPoints = true;
+            });
           }
-        }
+        });
       }
+      
+      const ctx = canvas.getContext('2d');
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = '#000';
+      
+      if (hasPoints) {
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const centerX = minX + width / 2;
+        const centerY = minY + height / 2;
+        
+        // Add padding
+        const paddedWidth = Math.max(width * 1.2, 100);
+        const paddedHeight = Math.max(height * 1.2, 100);
+        
+        // Calculate scale to fit 800x600, then reduce by 10%
+        const scaleX = 800 / paddedWidth;
+        const scaleY = 600 / paddedHeight;
+        const scale = Math.min(scaleX, scaleY, 3) * 0.9; // Scale down by 10%
+        
+        ctx.save();
+        ctx.translate(400, 300);
+        ctx.scale(scale, scale);
+        ctx.translate(-centerX, -centerY);
+        
+        results.drawing.forEach(stroke => {
+          if (!stroke.points || stroke.points.length < 2) return;
+          ctx.beginPath();
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          for (let i = 1; i < stroke.points.length; i++) {
+            ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+          }
+          ctx.stroke();
+        });
+        
+        ctx.restore();
+      } else {
+        // No drawing data
+        ctx.fillStyle = '#ccc';
+        ctx.font = '30px BestTen';
+        ctx.textAlign = 'center';
+        ctx.fillText('描画なし', 400, 300);
+      }
+      
+      drawingContainer.appendChild(canvas);
     }
   }
 
@@ -349,16 +426,17 @@ class UIManager {
     const waitingNext = document.getElementById('waiting-next');
 
     if (isHost) {
-      if (settingsCard) settingsCard.style.display = 'block';
       if (startBtn) startBtn.style.display = 'block';
       if (nextRoundBtn) nextRoundBtn.style.display = 'block';
       if (waitingNext) waitingNext.classList.add('hidden');
     } else {
-      if (settingsCard) settingsCard.style.display = 'none';
       if (startBtn) startBtn.style.display = 'none';
       if (nextRoundBtn) nextRoundBtn.style.display = 'none';
       if (waitingNext) waitingNext.classList.remove('hidden');
     }
+    
+    // Always show settings card (inputs disabled in client.js for non-hosts)
+    if (settingsCard) settingsCard.style.display = 'block';
   }
 
   showError(message) {
