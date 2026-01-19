@@ -14,7 +14,7 @@ class DrawingCanvas {
 
   setupCanvas() {
     this.ctx.strokeStyle = '#000000';
-    this.ctx.lineWidth = 3;
+    this.ctx.lineWidth = 10;
     this.ctx.lineCap = 'round';
     this.ctx.lineJoin = 'round';
   }
