@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>コンソール出力ビューア</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      background: #f5f5f5;
+      padding: 1rem;
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: #1a1a1a;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+
+    .input-section {
+      background: white;
+      border: 1px solid #e0e0e0;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    input[type="url"] {
+      flex: 1;
+      padding: 0.5rem;
+      border: 1px solid #d0d0d0;
+      font-size: 0.9rem;
+      font-family: monospace;
+    }
+
+    input[type="url"]:focus {
+      outline: none;
+      border-color: #000;
+    }
+
+    button {
+      background: #000;
+      color: white;
+      border: none;
+      padding: 0.5rem 1.5rem;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #333;
+    }
+
+    button:disabled {
+      background: #999;
+      cursor: not-allowed;
+    }
+
+    .viewer-section {
+      background: white;
+      border: 1px solid #e0e0e0;
+    }
+
+    .viewer-header {
+      background: #fafafa;
+      border-bottom: 1px solid #e0e0e0;
+      padding: 0.5rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .clear-btn {
+      background: white;
+      color: #000;
+      border: 1px solid #d0d0d0;
+      padding: 0.3rem 0.8rem;
+      font-size: 0.8rem;
+    }
+
+    .clear-btn:hover {
+      background: #f0f0f0;
+    }
+
+    iframe {
+      width: 100%;
+      height: 300px;
+      border: none;
+      border-bottom: 1px solid #e0e0e0;
+      display: block;
+    }
+
+    .console-output {
+      padding: 0.75rem;
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.8rem;
+      height: 250px;
+      overflow-y: auto;
+    }
+
+    .console-line {
+      padding: 0.15rem 0;
+      border-left: 2px solid transparent;
+      padding-left: 0.5rem;
+      margin-bottom: 0.15rem;
+      word-break: break-word;
+    }
+
+    .console-line.log {
+      border-left-color: #4ade80;
+    }
+
+    .console-line.error {
+      border-left-color: #f87171;
+      color: #fca5a5;
+    }
+
+    .console-line.warn {
+      border-left-color: #fbbf24;
+      color: #fde047;
+    }
+
+    .console-line.info {
+      border-left-color: #60a5fa;
+      color: #93c5fd;
+    }
+
+    .timestamp {
+      color: #888;
+      font-size: 0.7rem;
+      margin-right: 0.5rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h2>コンソール出力ビューア</h2>
+
+    <div class="input-section">
+      <input
+        type="url"
+        id="urlInput"
+        placeholder="https://example.com"
+        value="https://example.com"
+      >
+      <button id="loadBtn">読み込み</button>
+    </div>
+
+    <div class="viewer-section">
+      <div class="viewer-header">
+        <span>プレビュー</span>
+      </div>
+
+      <iframe id="targetFrame"></iframe>
+
+      <div class="viewer-header">
+        <span>コンソール</span>
+        <button class="clear-btn" id="clearBtn">クリア</button>
+      </div>
+
+      <div class="console-output" id="consoleOutput">
+        <div class="empty-state">コンソール出力がここに表示されます</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const urlInput = document.getElementById('urlInput');
+    const loadBtn = document.getElementById('loadBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const targetFrame = document.getElementById('targetFrame');
+    const consoleOutput = document.getElementById('consoleOutput');
+
+    let logs = [];
+
+    function stripAnsi(str) {
+      // ANSI エスケープコードを削除
+      return String(str).replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+    }
+
+    function addLog(type, message) {
+      const timestamp = new Date().toLocaleTimeString('ja-JP');
+      const cleanMessage = stripAnsi(message);
+      logs.push({ type, message: cleanMessage, timestamp });
+      renderLogs();
+    }
+
+    function renderLogs() {
+      if (logs.length === 0) {
+        consoleOutput.innerHTML = '<div class="empty-state">コンソール出力がここに表示されます</div>';
+        return;
+      }
+
+      consoleOutput.innerHTML = logs.map(log => `
+        <div class="console-line ${log.type}">
+          <span class="timestamp">[${log.timestamp}]</span>
+          <span>${escapeHtml(log.message)}</span>
+        </div>
+      `).join('');
+      
+      consoleOutput.scrollTop = consoleOutput.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = String(text);
+      return div.innerHTML;
+    }
+
+    loadBtn.addEventListener('click', () => {
+      const url = urlInput.value.trim();
+      if (!url) {
+        alert('URLを入力してください');
+        return;
+      }
+
+      logs = [];
+      renderLogs();
+      loadBtn.disabled = true;
+
+      targetFrame.src = url;
+
+      targetFrame.onload = () => {
+        loadBtn.disabled = false;
+        addLog('info', `読み込み完了: ${url}`);
+        
+        try {
+          const iframeWindow = targetFrame.contentWindow;
+          
+          const originalLog = iframeWindow.console.log;
+          const originalError = iframeWindow.console.error;
+          const originalWarn = iframeWindow.console.warn;
+          const originalInfo = iframeWindow.console.info;
+
+          iframeWindow.console.log = function(...args) {
+            addLog('log', args.map(a => String(a)).join(' '));
+            originalLog.apply(this, args);
+          };
+
+          iframeWindow.console.error = function(...args) {
+            addLog('error', args.map(a => String(a)).join(' '));
+            originalError.apply(this, args);
+          };
+
+          iframeWindow.console.warn = function(...args) {
+            addLog('warn', args.map(a => String(a)).join(' '));
+            originalWarn.apply(this, args);
+          };
+
+          iframeWindow.console.info = function(...args) {
+            addLog('info', args.map(a => String(a)).join(' '));
+            originalInfo.apply(this, args);
+          };
+
+          iframeWindow.addEventListener('error', (e) => {
+            addLog('error', `Error: ${e.message}`);
+          });
+
+        } catch (e) {
+          addLog('error', 'クロスオリジン制約によりコンソールにアクセスできません');
+        }
+      };
+
+      targetFrame.onerror = () => {
+        loadBtn.disabled = false;
+        addLog('error', 'ページの読み込みに失敗しました');
+      };
+    });
+
+    clearBtn.addEventListener('click', () => {
+      logs = [];
+      renderLogs();
+    });
+  </script>
+</body>
+
+</html>
