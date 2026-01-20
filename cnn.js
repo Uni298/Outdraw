@@ -97,19 +97,39 @@ function getModelNames() {
 // 署名はそのまま: async function loadModel(modelDir = "png_model_32")
 // -----------------------------------------------------
 async function loadModel(modelDir = "png_model_32") {
+    // ONNXモデルパス
     const onnxPath = path.join(modelDir, "model.onnx");
-    const catPath = path.join(modelDir, "categories.txt");
-
+    
+    // カテゴリファイルパス (引数で指定されたファイル、または modelDir/categories.txt)
+    // Note: server.js will need to pass this, or we rely on the 2nd argument
+    // arguments: loadModel(modelDir, categoriesFilePath)
+    
+    // Check if onnx exists
     if (!fs.existsSync(onnxPath)) {
         throw new Error(`ONNX model not found at ${onnxPath}`);
     }
-    if (!fs.existsSync(catPath)) {
-        throw new Error(`categories.txt not found at ${catPath}`);
+
+    // Load categories
+    // If categoriesFilePath is passed, use it. Otherwise default to modelDir/categories.txt
+    // Since we can't change the signature easily if used elsewhere, let's assume ai-bridge handles passing it.
+    // Wait, I need to update signature.
+    
+    let catPath;
+    if (arguments.length > 1 && arguments[1]) {
+        catPath = arguments[1]; // Use provided path
+    } else {
+        catPath = path.join(modelDir, "categories.txt");
     }
 
-    // カテゴリ読み込み
+    if (!fs.existsSync(catPath)) {
+        throw new Error(`categories file not found at ${catPath}`);
+    }
+
     const txt = fs.readFileSync(catPath, "utf-8");
     modelNames = txt.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+
+    console.log(`[CNN] Loaded categories from: ${catPath}`);
+    console.log(`[CNN] First category: ${modelNames[0]}`);
 
     // ONNX Runtime セッション作成
     session = await ort.InferenceSession.create(onnxPath);
@@ -142,34 +162,88 @@ async function predictStrokes(strokes, options = {}) {
     const results = await session.run({ input: inputTensor });
     const logits = results.logits.data; // Float32Array, 長さ num_classes
 
-    // ソフトマックスではなく、そのままスコアとして扱う
+    // Apply softmax to get probabilities
     const numClasses = logits.length;
-    const scored = [];
+    const expScores = [];
+    let sumExp = 0;
+    
     for (let i = 0; i < numClasses; i++) {
-        scored.push({
-            index: i,
-            score: logits[i],
-            name: modelNames[i] || `class_${i}`
-        });
+        const expVal = Math.exp(logits[i]);
+        expScores.push(expVal);
+        sumExp += expVal;
+    }
+    
+    const probabilities = expScores.map(exp => exp / sumExp);
+    
+    // Create scored array with probabilities
+    const scored = [];
+    const allowList = options.allowedCategories; // Array of category names or null
+
+    for (let i = 0; i < numClasses; i++) {
+        let score = logits[i];
+        let prob = probabilities[i];
+        const name = modelNames[i];
+
+        // Filter if allowList is provided
+        if (allowList && Array.isArray(allowList) && allowList.length > 0) {
+            // Check if name is in allowList (normalized check might be safer but exact match for now)
+            if (!allowList.includes(name)) {
+                score = -Infinity; // Push to bottom
+                prob = 0;
+            }
+        }
+
+        scored.push({ index: i, score: score, name: name, probability: prob });
     }
 
-    // スコアの降順（高い方が良い）
-    scored.sort((a, b) => b.score - a.score);
+    // If we have an allowList, we should strictly re-normalize probabilities 
+    // among the allowed items so that the best allowed item has high confidence
+    // relative to the "active" choices.
+    if (allowList && Array.isArray(allowList) && allowList.length > 0) {
+        // Filter out -Infinity (disallowed) items
+        const allowedScored = scored.filter(s => s.score > -Infinity);
+        
+        // Calculate new sum of exponentials (or just sum of current probs if we utilize them)
+        // Since original probs sum to 1 including Disallowed, we can just sum the allowed probs and divide?
+        // No, softmax is non-linear. We should re-softmax the logits of allowed items?
+        // Actually, just re-normalizing existing probabilities is mathematically equivalent 
+        // to re-running softmax on just the allowed subset IF we assume "others" are impossible.
+        
+        let sumAllowed = 0;
+        allowedScored.forEach(s => sumAllowed += s.probability);
+        
+        if (sumAllowed > 0) {
+            allowedScored.forEach(s => {
+                s.probability = s.probability / sumAllowed;
+            });
+            // Update original scored array references (which are objects)
+        }
+        
+        // Re-sort specifically for allowed items (though they should already be sorted relative to each other)
+        // Adjust the main list to ensure non-allowed are at bottom with 0 probability
+        // (Attempted in loop but let's be sure)
+    }
+
+    // Sort by probability (highest first)
+    scored.sort((a, b) => b.probability - a.probability);
 
     const topN = scored.slice(0, topNCount);
 
     const best = scored[0];
-    const second = scored.length > 1 ? scored[1] : { score: -Infinity };
+    const second = scored.length > 1 ? scored[1] : { probability: 0 };
 
-    const bestScore = best.score;
-    const secondScore = second.score;
-    const relativeGap = bestScore - secondScore;
+    // Calculate confidence as percentage (0-100)
+    const confidencePercent = Math.round(best.probability * 100);
 
     // もともとの distance ベースのしきい値と整合を取るための
     // ダミー距離変換（score が高いほど distance 小さいという扱い）
     function scoreToDistance(s) {
         return -s; // 符号を反転して distance っぽくする
     }
+
+    const bestScore = best.score;
+    const secondScore = second.score || -Infinity;
+    const relativeGap = bestScore - secondScore;
 
     const isConfident = (scoreToDistance(bestScore) < absoluteThreshold) &&
                         (relativeGap > relativeThreshold);
@@ -188,11 +262,13 @@ async function predictStrokes(strokes, options = {}) {
         classIndex: best.index,
         className: best.name,
         distance: scoreToDistance(bestScore), // 互換目的
+        confidencePercent: confidencePercent, // 0-100の確信度
         topN: topN.map(t => ({
             index: t.index,
             distance: scoreToDistance(t.score),
             name: t.name,
-            score: t.score
+            score: t.score,
+            probability: t.probability
         })),
         confidence: confidence,
         rawDistances: scored.map(s => scoreToDistance(s.score)),

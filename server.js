@@ -17,8 +17,14 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 // Initialize AI Bridge
-const aiBridge = new AIBridge(config.modelDir);
-const gameManager = new GameManager(aiBridge, config.categoriesFile);
+// config.categoriesFile is "categories_jp.txt" (or whatever config says)
+// We want to force it to use "public/categories_jp.txt" if configured that way
+// For now, let's look at config.categoriesFile and prepend public/ if needed, or assume it's relative to CWD.
+// User said "use public/categories_jp.txt".
+const categoriesPath = path.join('public', 'categories_jp.txt');
+const aiBridge = new AIBridge(config.modelDir, categoriesPath);
+// Also update GameManager to use the same file
+const gameManager = new GameManager(aiBridge, categoriesPath);
 
 // Set up state change callback for timer expirations
 gameManager.setStateChangeCallback((roomId) => {
@@ -37,10 +43,15 @@ function emitRoomState(roomId) {
     maxRounds: room.settings.maxRounds,
     players: Array.from(room.players.values()),
     aiScore: room.aiScore,
-    currentDrawer: room.currentDrawer,
+    roundResults: room.roundResults,
     activeCategoryIndices: room.activeCategoryIndices,
-    settings: room.settings
+    currentDrawer: room.currentDrawer, // Keep existing properties
+    settings: room.settings // Keep existing properties
   };
+
+  if (state.roundResults && state.roundResults.drawing) {
+    console.log(`[Server] Emitting state with roundResults.drawing: ${state.roundResults.drawing.length} strokes`);
+  }
 
   // Add state-specific data
   if (room.gameState === 'category-selection') {
@@ -168,6 +179,7 @@ io.on('connection', (socket) => {
 
     if (gameManager.addStroke(roomId, stroke)) {
       // Broadcast stroke to all players in room
+      // console.log(`[Server] Stroke added to room ${roomId}`);
       socket.to(roomId).emit('stroke-added', stroke);
     }
   });
@@ -222,6 +234,27 @@ io.on('connection', (socket) => {
 
     if (gameManager.nextRound(roomId)) {
       emitRoomState(roomId);
+    }
+  });
+
+  // Return to lobby (host only)
+  socket.on('return-to-lobby', (roomId) => {
+    const room = gameManager.getRoom(roomId);
+    if (!room || room.host !== socket.id) {
+      socket.emit('error', { message: 'ロビーに戻る権限がありません' });
+      return;
+    }
+
+    if (gameManager.returnToLobby(roomId)) {
+      emitRoomState(roomId);
+    }
+  });
+
+  // End Game (Host Only)
+  socket.on('end-game', () => {
+    const room = gameManager.getRoomBySocketId(socket.id);
+    if (room) {
+      gameManager.endGame(room.id, socket.id);
     }
   });
 

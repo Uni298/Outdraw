@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
@@ -8,9 +8,21 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DotGothic16&display=swap"
       rel="stylesheet"
     />
+    <style>
+      /* Fullscreen toggle button style */
+      #fullscreen-toggle {
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 2000;
+        padding: 6px 12px;
+        font-size: 14px;
+        cursor: pointer;
+      }
+    </style>
   </head>
   <body>
     <div id="app">
@@ -58,6 +70,12 @@
         </div>
       </div>
 
+      <!-- Room ID Display (Top Left) -->
+      <div id="room-id-display-container" class="room-id-display" style="display: none;">
+        <span>ルームID: </span>
+        <span id="room-id-display-value" class="room-id-value"></span>
+      </div>
+
       <!-- Room Screen -->
       <div id="room-screen" class="screen">
         <div class="container">
@@ -76,7 +94,12 @@
             </div>
 
             <div class="card" id="settings-card">
-              <h3>ゲーム設定 <span id="host-only-badge" class="host-badge hidden">ホスト専用</span></h3>
+              <h3>
+                ゲーム設定
+                <span id="host-only-badge" class="host-badge hidden"
+                  >ホスト専用</span
+                >
+              </h3>
               <div class="settings-grid">
                 <div class="setting-item">
                   <label for="drawing-time">描画時間 (秒)</label>
@@ -116,7 +139,9 @@
                   />
                 </div>
                 <div class="setting-item">
-                  <label for="active-category-count">モデル制限 (カテゴリ数)</label>
+                  <label for="active-category-count"
+                    >モデル制限 (カテゴリ数)</label
+                  >
                   <input
                     type="number"
                     id="active-category-count"
@@ -125,8 +150,26 @@
                     value="10"
                   />
                 </div>
+                <div class="setting-item">
+                  <label for="max-players">最大プレイヤー数</label>
+                  <input
+                    type="number"
+                    id="max-players"
+                    min="2"
+                    max="12"
+                    value="8"
+                  />
+                </div>
+                <div class="setting-item checkbox-item">
+                  <label for="allow-clear-canvas">クリアボタンを許可</label>
+                  <input type="checkbox" id="allow-clear-canvas" checked />
+                </div>
               </div>
-              <button id="update-settings-btn" class="btn btn-secondary" style="display: none;">
+              <button
+                id="update-settings-btn"
+                class="btn btn-secondary"
+                style="display: none"
+              >
                 設定を更新
               </button>
             </div>
@@ -164,6 +207,7 @@
             <div class="category-display">
               お題: <span id="current-category">???</span>
             </div>
+            <button id="end-game-btn-drawing" class="btn btn-secondary btn-small host-only hidden" style="margin-left: 10px;">中断</button>
           </div>
 
           <div class="drawing-area">
@@ -180,7 +224,28 @@
                 <h3>スコア</h3>
                 <div id="score-list" class="score-list"></div>
               </div>
-              <div class="canvas-tools" id="drawing-tools" style="display: none;">
+
+              <!-- Spectator Category Viewer -->
+              <div class="card" id="spectator-category-card" style="display: none;">
+                <h3>回答の候補</h3>
+                <div class="input-group">
+                  <input
+                    type="text"
+                    id="drawing-category-search"
+                    placeholder="カテゴリを検索..."
+                    autocomplete="off"
+                  />
+                  <div id="drawing-category-list" class="category-selector" style="height: 200px;">
+                    <!-- Categories will be populated here -->
+                  </div>
+                </div>
+              </div>
+              
+              <div
+                class="canvas-tools"
+                id="drawing-tools"
+                style="display: none"
+              >
                 <button id="clear-canvas-btn" class="btn btn-secondary">
                   クリア
                 </button>
@@ -188,13 +253,6 @@
                   描画完了
                 </button>
               </div>
-              <div class="card" id="reaction-card" style="display: none;">
-                <h3>リアクション</h3>
-                <div class="reaction-buttons">
-                  <button class="reaction-btn" data-emoji="good">
-                    <img src="/images/good.png" alt="Good" style="width: 24px; height: 24px;">
-                  </button>
-                </div>
               </div>
             </div>
           </div>
@@ -216,6 +274,7 @@
               >
             </div>
             <div class="timer" id="guessing-timer">30</div>
+            <button id="end-game-btn-guessing" class="btn btn-secondary btn-small host-only hidden" style="margin-left: auto;">中断</button>
           </div>
 
           <div class="guessing-area">
@@ -223,27 +282,38 @@
               <canvas id="guess-canvas" width="800" height="600"></canvas>
             </div>
 
-                    <div class="sidebar">
-                        <div class="card">
-                            <h3>この絵は何?</h3>
-                            <div class="input-group">
-                                <input type="text" id="category-search" placeholder="カテゴリを検索..." autocomplete="off">
-                                <div id="category-list" class="category-selector">
-                                    <!-- Categories will be populated here -->
-                                </div>
-                                <button id="submit-guess-btn" class="btn btn-primary" disabled>回答する</button>
-                            </div>
-                            <div id="guess-status" class="guess-status"></div>
-                            <div id="selected-category" class="selected-category hidden">
-                                選択中: <span id="selected-category-name"></span>
-                            </div>
-                        </div>
+            <div class="sidebar">
+              <div class="card">
+                <h3>この絵は何?</h3>
+                <div class="input-group">
+                  <input
+                    type="text"
+                    id="category-search"
+                    placeholder="カテゴリを検索..."
+                    autocomplete="off"
+                  />
+                  <div id="category-list" class="category-selector">
+                    <!-- Categories will be populated here -->
+                  </div>
+                  <button
+                    id="submit-guess-btn"
+                    class="btn btn-primary"
+                    disabled
+                  >
+                    回答する
+                  </button>
+                </div>
+                <div id="guess-status" class="guess-status"></div>
+                <div id="selected-category" class="selected-category hidden">
+                  選択中: <span id="selected-category-name"></span>
+                </div>
+              </div>
 
-                        <div class="card">
-                            <h3>回答済みプレイヤー</h3>
-                            <div id="guessed-players" class="guessed-list"></div>
-                        </div>
-                    </div>
+              <div class="card">
+                <h3>回答済みプレイヤー</h3>
+                <div id="guessed-players" class="guessed-list"></div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -252,7 +322,10 @@
       <div id="results-screen" class="screen">
         <div class="container">
           <div class="results-header-container">
-            <div id="result-head-human" class="result-head-score human-score-box">
+            <div
+              id="result-head-human"
+              class="result-head-score human-score-box"
+            >
               <span class="score-label">人間チーム</span>
               <span class="score-num">0点</span>
             </div>
@@ -264,11 +337,11 @@
           </div>
 
           <div class="results-content">
-            <div class="winner-banner" id="winner-banner" style="opacity: 0;">
+            <div class="winner-banner" id="winner-banner" style="opacity: 0">
               <div class="winner-icon">🏆</div>
               <div class="winner-text" id="winner-text">人間チームの勝利!</div>
             </div>
-            
+
             <div id="correct-answer" class="correct-answer">正解: ---</div>
 
             <div class="results-grid">
@@ -279,9 +352,12 @@
 
               <div class="card result-drawing-card">
                 <h3>描かれた絵</h3>
-                <div id="result-drawing-container" class="result-drawing-container"></div>
+                <div
+                  id="result-drawing-container"
+                  class="result-drawing-container"
+                ></div>
               </div>
-              
+
               <div class="card">
                 <h3>AIの予想</h3>
                 <div id="ai-predictions" class="ai-results"></div>
@@ -308,8 +384,8 @@
             <div id="final-score-list" class="score-list-large"></div>
           </div>
 
-          <button id="new-game-btn" class="btn btn-primary btn-large">
-            新しいゲーム
+          <button id="return-lobby-btn" class="btn btn-primary btn-large">
+            ロビーに戻る
           </button>
         </div>
       </div>
@@ -317,6 +393,14 @@
 
     <!-- Reaction Display -->
     <div class="reaction-display" id="reactionDisplay"></div>
+
+    <!-- Transition Overlay -->
+    <div id="transition-overlay" class="transition-overlay">
+      <div id="confidence-display" class="confidence-display">
+        <div class="confidence-label">AI確信度</div>
+        <div class="confidence-value"><span id="confidence-number">0</span>%</div>
+      </div>
+    </div>
 
     <!-- Confirm Modal -->
     <div id="confirmModal">
@@ -330,14 +414,23 @@
       </div>
     </div>
 
+    <!-- Floating Reaction Buttons (Left of Chat) -->
+    <div id="floating-reaction-bar" class="floating-reaction-bar" style="display: none;">
+      <button class="reaction-btn" data-emoji="good">
+        <img src="/images/good.png" alt="Good" style="width: 24px; height: 24px" />
+      </button>
+    </div>
+
     <!-- Chat Box -->
     <div id="chatBox" class="minimized">
       <div id="chatHeader">
-        <span>💬 チャット</span>
-        <button id="chatToggle">▼</button>
+        <div class="chat-header-content">
+          <button id="chatToggle">▲</button>
+          <span id="chatNotification" class="notification-badge hidden"></span>
+        </div>
       </div>
       <div id="chatMessages"></div>
-      <div class="chat-preview" id="chatPreview">新しいメッセージはありません</div>
+      <!-- chat-preview removed -->
       <div id="chatInputArea">
         <input type="text" id="chatInput" placeholder="メッセージを入力..." />
         <button id="chatSendBtn">送信</button>
@@ -345,6 +438,7 @@
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/translations.js"></script>
     <script src="/js/canvas.js"></script>
     <script src="/js/ui.js"></script>
     <script src="/js/client.js"></script>

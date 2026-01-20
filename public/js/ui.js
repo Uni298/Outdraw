@@ -32,6 +32,8 @@ class UIManager {
 
       list.innerHTML = '';
 
+      if (!players) return; // Add check for players
+      
       players.forEach(player => {
         const item = document.createElement('div');
         item.className = 'player-item';
@@ -74,51 +76,51 @@ class UIManager {
       document.getElementById('results-score-list'),
       document.getElementById('final-score-list')
     ];
-    
-    // Calculate Human Team Score
-    const players = state.players || [];
-    const humanScore = players.reduce((sum, p) => sum + p.score, 0);
-    const aiScore = state.aiScore || 0;
 
     lists.forEach(list => {
       if (!list) return;
 
       list.innerHTML = '';
 
-      // Human Team Item
+      // Calculate team scores
+      let humanScore = 0;
+      state.players.forEach(player => {
+        humanScore += player.score;
+      });
+      const aiScore = state.aiScore || 0;
+
+      // Human team score
       const humanItem = document.createElement('div');
       humanItem.className = 'score-item';
-      humanItem.style.background = '#FF9446'; // Orange
+      humanItem.style.background = '#FF9446';
       humanItem.style.color = 'white';
-      
+
       const humanName = document.createElement('div');
       humanName.className = 'score-name';
       humanName.textContent = '人間チーム';
-      
+
       const humanValue = document.createElement('div');
       humanValue.className = 'score-value';
-      humanValue.style.color = 'white';
       humanValue.textContent = `${humanScore}点`;
-      
+
       humanItem.appendChild(humanName);
       humanItem.appendChild(humanValue);
       list.appendChild(humanItem);
-      
-      // AI Team Item
+
+      // AI team score
       const aiItem = document.createElement('div');
       aiItem.className = 'score-item';
-      aiItem.style.background = '#330634'; // Dark Purple
+      aiItem.style.background = '#330634';
       aiItem.style.color = 'white';
-      
+
       const aiName = document.createElement('div');
       aiName.className = 'score-name';
       aiName.textContent = 'AI';
-      
+
       const aiValue = document.createElement('div');
       aiValue.className = 'score-value';
-      aiValue.style.color = 'white';
       aiValue.textContent = `${aiScore}点`;
-      
+
       aiItem.appendChild(aiName);
       aiItem.appendChild(aiValue);
       list.appendChild(aiItem);
@@ -129,10 +131,14 @@ class UIManager {
     const aiHeadEl = document.getElementById('result-head-ai');
     
     if (humanHeadEl) {
+      let humanScore = 0;
+      state.players.forEach(player => {
+        humanScore += player.score;
+      });
       humanHeadEl.querySelector('.score-num').textContent = `${humanScore}点`;
     }
     if (aiHeadEl) {
-      aiHeadEl.querySelector('.score-num').textContent = `${aiScore}点`;
+      aiHeadEl.querySelector('.score-num').textContent = `${state.aiScore || 0}点`;
     }
   }
 
@@ -159,6 +165,7 @@ class UIManager {
     // Handle screen switching based on game state
     switch (state.gameState) {
       case 'lobby':
+        document.getElementById('results-screen').classList.remove('visible'); // Reset visibility
         this.showScreen('room-screen');
         break;
       case 'category-selection':
@@ -199,8 +206,21 @@ class UIManager {
         // Update guess status?
         break;
       case 'results':
-        this.showScreen('results-screen');
+        // Do NOT immediately show 'results-screen' here to prevent flash.
+        // client.js handleResults (via handleGameState or event) will trigger the transition.
+        // However, if we reload the page, we might be stuck in limbo if we don't show it.
+        // Check if overlay is covering. If NOT covering, we should show it (e.g. refresh).
+        // If overlay IS covering or melting, we leave it alone.
+        const overlay = document.getElementById('transition-overlay');
+        const overlayActive = overlay && (overlay.classList.contains('active') || overlay.classList.contains('melting'));
+        
+        // Always populate data
         this.showResults(state.results, state.results.correctAnswer, state.players);
+        
+        if (!overlayActive) {
+           // If no transition happening, just show it (e.g. reload)
+           this.showScreen('results-screen');
+        }
         break;
       case 'finished':
         this.showScreen('finished-screen');
@@ -295,16 +315,18 @@ class UIManager {
     }
 
     // Show correct answer
-    document.getElementById('correct-answer').textContent = correctAnswer;
+    // Translate if available
+    const translatedCorrect = window.translateCategory ? window.translateCategory(correctAnswer) : correctAnswer;
+    document.getElementById('correct-answer').textContent = `正解: ${translatedCorrect}`;
 
     // Show human guesses
     const humanGuesses = document.getElementById('human-guesses');
     humanGuesses.innerHTML = '';
 
-    if (results.allGuesses.length === 0) {
+    if (!results.guesses || results.guesses.length === 0) {
       humanGuesses.innerHTML = '<p style="color: #7F8C8D;">回答なし</p>';
     } else {
-      results.allGuesses.forEach(guess => {
+      results.guesses.forEach(guess => {
         const item = document.createElement('div');
         item.className = 'guess-result-item';
 
@@ -315,8 +337,7 @@ class UIManager {
         }
 
         item.innerHTML = `
-          <span>${guess.playerName}</span>
-          <span>${guess.guess}</span>
+          <span>${guess.playerName} : ${guess.guess}</span>
         `;
 
         humanGuesses.appendChild(item);
@@ -335,85 +356,69 @@ class UIManager {
         item.classList.add('match');
       }
 
+      const translatedName = window.translateCategory ? window.translateCategory(pred.name) : pred.name;
+
       item.innerHTML = `
-        <span><span class="ai-rank">${index + 1}位:</span> ${pred.name}</span>
+        <span><span class="ai-rank">${index + 1}位:</span> ${translatedName}</span>
       `;
 
       aiPredictions.appendChild(item);
     });
 
-    // Show drawing
+    // Render drawing
     const drawingContainer = document.getElementById('result-drawing-container');
-    if (drawingContainer && results.drawing) {
-      drawingContainer.innerHTML = '';
-      const canvas = document.createElement('canvas');
-      canvas.width = 800;
-      canvas.height = 600;
+    if (results.drawing && results.drawing.length > 0) {
+      console.log('[UI] Rendering drawing with', results.drawing.length, 'strokes');
       
-      // Calculate bounds to center and scale
-      let minX = 800, maxX = 0, minY = 600, maxY = 0;
-      let hasPoints = false;
+      // Use 800x600 temp canvas to match source coordinate system
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = 800;
+      tempCanvas.height = 600;
+      const ctx = tempCanvas.getContext('2d');
       
-      if (results.drawing && results.drawing.length > 0) {
-        results.drawing.forEach(stroke => {
-          if (stroke.points && stroke.points.length > 0) {
-            stroke.points.forEach(p => {
-              if (p.x < minX) minX = p.x;
-              if (p.x > maxX) maxX = p.x;
-              if (p.y < minY) minY = p.y;
-              if (p.y > maxY) maxY = p.y;
-              hasPoints = true;
-            });
-          }
-        });
-      }
-      
-      const ctx = canvas.getContext('2d');
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 10; 
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = '#000';
       
-      if (hasPoints) {
-        const width = maxX - minX;
-        const height = maxY - minY;
-        const centerX = minX + width / 2;
-        const centerY = minY + height / 2;
-        
-        // Add padding
-        const paddedWidth = Math.max(width * 1.2, 100);
-        const paddedHeight = Math.max(height * 1.2, 100);
-        
-        // Calculate scale to fit 800x600, then reduce by 10%
-        const scaleX = 800 / paddedWidth;
-        const scaleY = 600 / paddedHeight;
-        const scale = Math.min(scaleX, scaleY, 3) * 0.9; // Scale down by 10%
-        
-        ctx.save();
-        ctx.translate(400, 300);
-        ctx.scale(scale, scale);
-        ctx.translate(-centerX, -centerY);
-        
-        results.drawing.forEach(stroke => {
-          if (!stroke.points || stroke.points.length < 2) return;
+      // No scaling needed since we use 800x600
+      
+      // Draw all strokes
+      results.drawing.forEach((stroke, index) => {
+        let xs, ys;
+        // Handle both [[x...], [y...]] and { points: [[x...], [y...]] } formats
+        if (Array.isArray(stroke) && stroke.length === 2 && Array.isArray(stroke[0])) {
+            xs = stroke[0];
+            ys = stroke[1];
+        } else if (stroke && stroke.points && Array.isArray(stroke.points) && stroke.points.length === 2) {
+            xs = stroke.points[0];
+            ys = stroke.points[1];
+        } else {
+            return;
+        }
+
+        if (xs.length > 0) {
           ctx.beginPath();
-          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          for (let i = 1; i < stroke.points.length; i++) {
-            ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+          ctx.moveTo(xs[0], ys[0]);
+          for (let i = 1; i < xs.length; i++) {
+            ctx.lineTo(xs[i], ys[i]);
           }
           ctx.stroke();
-        });
-        
-        ctx.restore();
-      } else {
-        // No drawing data
-        ctx.fillStyle = '#ccc';
-        ctx.font = '30px BestTen';
-        ctx.textAlign = 'center';
-        ctx.fillText('描画なし', 400, 300);
-      }
+        }
+      });
       
-      drawingContainer.appendChild(canvas);
+      // Convert to PNG and display
+      const img = document.createElement('img');
+      img.src = tempCanvas.toDataURL('image/png');
+      img.style.maxWidth = '100%';
+      img.style.objectFit = 'contain';
+      img.style.border = '1px solid #eee'; // Temporary border to see if container exists
+      
+      drawingContainer.innerHTML = '';
+      drawingContainer.appendChild(img);
+    } else {
+      console.log('[UI] No drawing data found in results');
+      drawingContainer.innerHTML = '<p style="color: #888;">描画データがありません</p>';
     }
   }
 

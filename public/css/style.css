@@ -5,24 +5,24 @@
 }
 
 @font-face {
-  font-family: 'BestTen';
-  src: url('/fonts/BestTen-DOT.woff') format('woff');
+  font-family: "BestTen";
+  src: url("/fonts/BestTen-DOT.woff") format("woff");
   font-weight: normal;
   font-style: normal;
 }
 
 @property --wave-progress {
-  syntax: '<percentage>';
+  syntax: "<percentage>";
   inherits: false;
   initial-value: 0%;
 }
 
 :root {
-  --primary-color: #FF9446;
+  --primary-color: #ff9446;
   --secondary-color: #330634;
   --danger-color: #ff0000;
   --success-color: #00ff00;
-  --bg-color: #EBE6EB;
+  --bg-color: #ebe6eb;
   --card-bg: #ffffff;
   --text-primary: #330634;
   --text-secondary: #666666;
@@ -31,10 +31,11 @@
   --shadow-hover: none;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   overflow: hidden;
-  font-family: 'BestTen', "Noto Sans JP", sans-serif;
+  font-family: "BestTen", "Noto Sans JP", sans-serif;
 }
 
 body {
@@ -47,38 +48,62 @@ body {
 }
 
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: radial-gradient(circle, rgba(51, 6, 52, 0.05) 3px, transparent 3px);
+  background-image: radial-gradient(
+    circle,
+    rgba(51, 6, 52, 0.05) 3px,
+    transparent 3px
+  );
   background-size: 25px 25px;
   background-position: center center;
-  z-index: 0;
+  z-index: -1;
 }
 
 body::after {
-  content: '';
+  content: "";
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background-image: radial-gradient(circle, rgba(51, 6, 52, 0.15) 4px, transparent 4px);
+  background-image: radial-gradient(
+    circle,
+    rgba(51, 6, 52, 0.15) 4px,
+    transparent 4px
+  );
   background-size: 25px 25px;
   background-position: center center;
-  z-index: 0;
-  mask-image: radial-gradient(circle, transparent calc(var(--wave-progress) - 30%), black var(--wave-progress), transparent calc(var(--wave-progress) + 10%));
-  -webkit-mask-image: radial-gradient(circle, transparent calc(var(--wave-progress) - 30%), black var(--wave-progress), transparent calc(var(--wave-progress) + 10%));
+  z-index: -1;
+  mask-image: radial-gradient(
+    circle,
+    transparent calc(var(--wave-progress) - 30%),
+    black var(--wave-progress),
+    transparent calc(var(--wave-progress) + 10%)
+  );
+  -webkit-mask-image: radial-gradient(
+    circle,
+    transparent calc(var(--wave-progress) - 30%),
+    black var(--wave-progress),
+    transparent calc(var(--wave-progress) + 10%)
+  );
   animation: waveMask 4s linear infinite;
 }
 
 @keyframes waveMask {
-  0% { --wave-progress: 0%; }
-  60% { --wave-progress: 150%; }
-  100% { --wave-progress: 150%; }
+  0% {
+    --wave-progress: 0%;
+  }
+  60% {
+    --wave-progress: 150%;
+  }
+  100% {
+    --wave-progress: 150%;
+  }
 }
 
 #app {
@@ -105,11 +130,11 @@ body::after {
   .screen {
     padding: 1rem;
   }
-  
+
   .drawing-area {
     grid-template-columns: 1fr 280px;
   }
-  
+
   .guessing-area {
     grid-template-columns: 1fr 380px;
   }
@@ -119,15 +144,15 @@ body::after {
   .screen {
     padding: 1rem 2rem;
   }
-  
+
   .drawing-area {
     grid-template-columns: 1fr 300px;
   }
-  
+
   .guessing-area {
     grid-template-columns: 1fr 400px;
   }
-  
+
   .category-grid {
     max-width: 1000px;
   }
@@ -140,6 +165,47 @@ body::after {
   to {
     opacity: 1;
   }
+}
+
+.ai-prediction {
+  padding: 0.8rem;
+  margin: 0.5rem 0;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-color);
+  font-size: 0.9rem;
+  min-height: 3rem;
+  display: flex;
+  align-items: center;
+}
+
+/* Room ID Display (Top Left) */
+.room-id-display {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid var(--border-color);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  z-index: 9999; /* Increased Z-Index */
+  font-size: 0.9rem;
+  color: white;
+  display: flex !important; /* Force display if JS toggling is buggy initially, but better to control via JS */
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.room-id-value {
+  font-weight: bold;
+  color: var(--primary-color);
+  cursor: pointer;
+  user-select: all;
+}
+
+.room-id-value:hover {
+  text-decoration: underline;
 }
 
 .container {
@@ -455,6 +521,17 @@ body::after {
   text-transform: uppercase;
 }
 
+.setting-item.checkbox-item {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  display: flex;
+}
+
+.setting-item.checkbox-item label {
+  margin-bottom: 0;
+}
+
 .setting-item input,
 .setting-item select {
   width: 100%;
@@ -523,7 +600,7 @@ body::after {
   color: var(--primary-color);
   min-width: 70px;
   text-align: center;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
 }
 
 .timer.warning {
@@ -787,54 +864,54 @@ body::after {
 
 /* Category Selector */
 .category-selector {
-    max-height: 250px;
-    overflow-y: auto;
-    border: 3px solid var(--border-color);
-    margin-top: 0.4rem;
-    margin-bottom: 0.5rem;
-    background: white;
+  max-height: 250px;
+  overflow-y: auto;
+  border: 3px solid var(--border-color);
+  margin-top: 0.4rem;
+  margin-bottom: 0.5rem;
+  background: white;
 }
 
 .category-item {
-    padding: 0.5rem;
-    cursor: pointer;
-    transition: background 0.1s;
-    border-bottom: 2px solid var(--border-color);
-    font-weight: 600;
-    font-size: 0.85rem;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: background 0.1s;
+  border-bottom: 2px solid var(--border-color);
+  font-weight: 600;
+  font-size: 0.85rem;
 }
 
 .category-item:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .category-item:hover {
-    background: var(--border-color);
-    color: var(--bg-color);
+  background: var(--border-color);
+  color: var(--bg-color);
 }
 
 .category-item.selected {
-    background: var(--primary-color);
-    color: white;
-    font-weight: 700;
+  background: var(--primary-color);
+  color: white;
+  font-weight: 700;
 }
 
 .category-item.hidden {
-    display: none;
+  display: none;
 }
 
 .selected-category {
-    margin-top: 0.5rem;
-    padding: 0.5rem;
-    background: var(--primary-color);
-    font-weight: 700;
-    color: white;
-    border: 3px solid var(--border-color);
-    font-size: 0.85rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--primary-color);
+  font-weight: 700;
+  color: white;
+  border: 3px solid var(--border-color);
+  font-size: 0.85rem;
 }
 
 .selected-category span {
-    font-weight: 700;
+  font-weight: 700;
 }
 
 /* Results Header */
@@ -865,7 +942,7 @@ body::after {
 }
 
 .result-head-score.human-score-box {
-  background: #FF9446;
+  background: #ff9446;
   color: white;
   transform: rotate(-2deg);
 }
@@ -907,6 +984,7 @@ body::after {
 .result-drawing-container {
   width: 100%;
   height: 100%;
+  max-height: 200px; /* Ensure visibility */
   background: white;
   display: flex;
   align-items: center;
@@ -921,7 +999,7 @@ body::after {
 }
 
 .correct-answer::before {
-  content: 'お題: ';
+  content: "お題: ";
   font-size: 1rem;
   display: block;
   margin-bottom: 0.2rem;
@@ -943,11 +1021,13 @@ body::after {
 .winner-banner {
   background: var(--primary-color);
   color: white;
-  padding: 0.5rem;
+  padding: 0.8rem;
   border: 4px solid var(--border-color);
   text-align: center;
   margin-bottom: 0.5rem;
-  transition: opacity 0.5s ease, background-color 0.5s ease;
+  transition:
+    opacity 0.5s ease,
+    background-color 0.5s ease;
 }
 
 .winner-banner.ai-win {
@@ -1037,21 +1117,20 @@ body::after {
 .guess-result-item {
   display: flex;
   justify-content: space-between;
-  padding: 1rem;
+  padding: 0.6rem;
   border-bottom: 2px solid var(--border-color);
   background: white;
-  font-size: 1.2rem;
-  font-weight: bold;
+  font-size: 0.9rem;
 }
 
 .guess-result-item.correct {
-  background: #90EE90;
+  background: #90ee90;
   color: var(--border-color);
   font-weight: 600;
 }
 
 .guess-result-item.incorrect {
-  background: #FFB6C1;
+  background: #ffb6c1;
   color: var(--text-primary);
 }
 
@@ -1069,7 +1148,7 @@ body::after {
 }
 
 .ai-prediction.match {
-  background: #FFB6C1;
+  background: #ffb6c1;
   color: var(--text-primary);
   font-weight: 600;
 }
@@ -1098,6 +1177,7 @@ body::after {
 
 .score-list-large .score-value {
   font-size: 1.3rem;
+  color: #ffffff !important;
 }
 
 /* Waiting */
@@ -1121,6 +1201,56 @@ body::after {
     transform: rotate(360deg);
   }
 }
+
+.canvas-container {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  background: white;
+  border-radius: 8px;
+  border: 3px solid var(--border-color);
+  overflow: visible;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+/* Floating Reaction Bar */
+.floating-reaction-bar {
+  position: fixed;
+  bottom: 1rem;
+  right: 320px; /* 300px width + 20px gap */
+  display: flex;
+  gap: 0.5rem;
+  z-index: 1000;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 3px solid var(--border-color);
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+}
+
+.floating-reaction-bar .reaction-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  background: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+}
+
+.floating-reaction-bar .reaction-btn:hover {
+  transform: scale(1.1);
+  background: #f0f0f0;
+}
+
+.floating-reaction-bar .reaction-btn:active {
+  transform: scale(0.95);
+}
+
 
 /* Chat Box */
 #chatBox {
@@ -1284,4 +1414,319 @@ body::after {
 
 #chatSendBtn:active {
   transform: scale(0.95);
+}
+
+/* Particles Background Z-Index */
+#particles-js {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -10 !important;
+  pointer-events: none;
+}
+
+/* Chat Minimized Width */
+#chatBox.minimized {
+  height: auto;
+  width: 50px; /* Small square */
+}
+
+#chatBox.minimized #chatHeader {
+  justify-content: center;
+  padding: 0;
+}
+
+#chatBox.minimized #chatToggle {
+  font-size: 1.2rem;
+  width: 100%;
+  height: 100%;
+}
+
+/* Force Score Text White */
+.score-item, 
+.score-name, 
+.score-value,
+.player-list-small .player-item,
+.player-list-small .player-name,
+.player-list-small .host-badge {
+  color: white !important;
+}
+
+/* Hide Scrollbars */
+/* Hide Scrollbars */
+.guess-results,
+.result-drawing-container,
+.ai-results,
+#chatMessages {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+
+/* Results Screen Scroll Setup */
+.results-content {
+  overflow-y: auto;
+  max-height: calc(100vh - 200px); /* Ensure it fits within screen with header/footer */
+  padding-bottom: 2rem;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  
+  /* Center layout with margins */
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-left: 2rem;
+  padding-right: 2rem;
+}
+
+.results-content::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* Fix Canvas Aspect Ratio in Guessing/Drawing */
+canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+#confidence-number, .confidence-value {
+  font-family: 'DotGothic16', sans-serif;
+  letter-spacing: 4px; /* Increased from 2px */
+  margin-right: -4px; /* Counter-balance the last character spacing */
+  text-shadow: none !important;
+}
+
+#confidence-number {
+  padding-right: 4px; /* Increased to 4px as requested */
+}
+
+
+
+/* Chat is 300px wide + ~20px margin/padding when open, so 320px is good. */
+/* When minimized, chat is 50px wide relative to right edge + margins. */
+/* #chatBox.minimized width is 50px */
+/* Let's attach a class or use sibling selector if possible, but reaction bar isn't sibling in a way we can use easily.
+   Wait, they are siblings in body effectively. But better to use :has or a class on body. 
+   Assuming I can't easily rely on :has for all browsers or structure, let's use a specific rule 
+   targeting the bar when chat is minimized via JS toggle, OR just position it relative to right.
+*/
+
+/* If we can't easily change the class on the bar from JS without finding where it is toggled,
+   let's see if we can use a general rule.
+   Checking client.js/chat.js: toggling chat adds .minimized to #chatBox.
+   We can add a listener or use :has if support is okay (modern browsers yes).
+*/
+body:has(#chatBox.minimized) .floating-reaction-bar {
+  right: 70px; /* 50px width + 10-20px gap */
+}
+
+/* Fallback/Correction if user is on older browser or specificity issues: 
+   The user asked to move it "next to the open button". 
+*/
+
+/* Ensure Result Drawing Container is visible */
+.result-drawing-container {
+  min-height: 250px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  /* Removed overflow: hidden to allow full image if contained by max-width */
+  padding: 20px;
+}
+
+/* Floating Reaction Bar */
+.floating-reaction-bar {
+  position: fixed;
+  bottom: 0.5rem;
+  right: 320px; /* Default next to open chat */
+  display: flex;
+  gap: 0.5rem;
+  z-index: 1000;
+  background: white;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 3px solid var(--border-color);
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  transition: right 0.3s; /* Animate position change */
+}
+#chatMessages::-webkit-scrollbar {
+  display: none; /* Chrome, Safari */
+}
+
+/* Chat Header Adjustments */
+#chatHeader {
+  background: var(--primary-color);
+  padding: 0.2rem;
+  font-weight: 700;
+  text-align: center;
+  border-bottom: 4px solid var(--border-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  height: 40px; /* Fixed height */
+}
+
+#chatToggle {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.notification-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  background-color: var(--danger-color);
+  border-radius: 50%;
+  border: 2px solid white;
+  display: block;
+}
+
+.notification-badge.hidden {
+  display: none;
+}
+
+/* Initially hide results screen content to prevent flash */
+#results-screen {
+  opacity: 0;
+  visibility: hidden; /* Add visibility hidden to be sure */
+}
+
+
+#results-screen.visible {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.5s ease; /* Fade in when class added */
+}
+
+/* Transition Overlay (Orange Melt) */
+.transition-overlay {
+  position: fixed;
+  top: -150%; /* Move way up */
+  left: 0;
+  width: 100%;
+  height: 150%; /* Larger height */
+  background: #ff9446; /* Orange */
+  z-index: 2000;
+  pointer-events: none;
+  transition:
+    top 0.8s ease-in,
+    visibility 0s 0.8s; /* Slow down to 0.8s */
+  visibility: hidden; /* Ensure hidden */
+}
+
+.transition-overlay.no-transition {
+  transition: none !important;
+}
+
+.transition-overlay.active {
+  top: 0;
+  visibility: visible;
+  transition:
+    top 0.8s ease-in,
+    visibility 0s;
+}
+
+.transition-overlay.melting {
+  top: calc(100% + 60px); /* Move further down to hide the top jagged edge */
+  transition: top 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+}
+
+/* Jagged bottom edge */
+.transition-overlay::after {
+  content: "";
+  position: absolute;
+  bottom: -50px;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background: #ff9446;
+  clip-path: polygon(
+    0% 0%,
+    5% 100%,
+    10% 0%,
+    15% 80%,
+    20% 0%,
+    25% 100%,
+    30% 0%,
+    35% 60%,
+    40% 0%,
+    45% 100%,
+    50% 0%,
+    55% 90%,
+    60% 0%,
+    65% 100%,
+    70% 0%,
+    75% 70%,
+    80% 0%,
+    85% 100%,
+    90% 0%,
+    95% 40%,
+    100% 0%
+  );
+}
+
+/* Jagged top edge */
+.transition-overlay::before {
+  content: "";
+  position: absolute;
+  top: -50px;
+  left: 0;
+  width: 100%;
+  height: 50px;
+  background: #ff9446;
+  /* Flip the polygon vertically for top edge variation, or use same pattern */
+  clip-path: polygon(
+    0% 100%,
+    5% 0%,
+    10% 100%,
+    15% 20%,
+    20% 100%,
+    25% 0%,
+    30% 100%,
+    35% 40%,
+    40% 100%,
+    45% 0%,
+    50% 100%,
+    55% 10%,
+    60% 100%,
+    65% 0%,
+    70% 100%,
+    75% 30%,
+    80% 100%,
+    85% 0%,
+    100% 100%
+  );
+}
+
+/* Confidence Display on Overlay */
+.confidence-display {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: white;
+  font-family: 'DotGothic16', sans-serif;
+}
+
+.confidence-label {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  opacity: 0.9;
+}
+
+.confidence-value {
+  font-size: 4rem;
+  font-weight: bold;
+  text-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
 }

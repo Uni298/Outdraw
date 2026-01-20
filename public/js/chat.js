@@ -12,6 +12,12 @@ let lastMessage = '';
 chatToggle.addEventListener('click', () => {
   chatBox.classList.toggle('minimized');
   chatToggle.textContent = chatBox.classList.contains('minimized') ? '▲' : '▼';
+  
+  // Clear notification if opened
+  if (!chatBox.classList.contains('minimized')) {
+    const badge = document.getElementById('chatNotification');
+    if (badge) badge.classList.add('hidden');
+  }
 });
 
 // Click header to toggle
@@ -39,9 +45,11 @@ function addChatMessage(username, message, isCurrentUser = false) {
   chatMessages.appendChild(messageDiv);
   chatMessages.scrollTop = chatMessages.scrollHeight;
   
-  // Update preview
-  lastMessage = `${username}: ${message}`;
-  chatPreview.textContent = lastMessage;
+  // Update notification if minimized and not my message
+  if (chatBox.classList.contains('minimized') && !isCurrentUser) {
+    const badge = document.getElementById('chatNotification');
+    if (badge) badge.classList.remove('hidden');
+  }
 }
 
 // Send a chat message

@@ -5,8 +5,9 @@ class AIBridge {
   /**
    * @param {string} modelDir - TensorFlow.js のモデルが格納されたディレクトリ
    */
-  constructor(modelDir = "png_model_32") {
+  constructor(modelDir = "png_model_32", categoriesFile = null) {
     this.modelDir = modelDir;
+    this.categoriesFile = categoriesFile;
     this.isReady = false;
   }
 
@@ -17,9 +18,12 @@ class AIBridge {
   async start() {
     console.log("[AI Bridge] Loading model...");
     const resolvedDir = path.resolve(this.modelDir);
-    await testHeadless.loadModel(resolvedDir);
+    // Resolve categories file if provided, otherwise null (defaults to internal)
+    const resolvedCategories = this.categoriesFile ? path.resolve(this.categoriesFile) : null;
+    
+    await testHeadless.loadModel(resolvedDir, resolvedCategories);
     this.isReady = true;
-    console.log("[AI Bridge] Ready.");
+    console.log("[AI Bridge] Ready. Categories loaded from:", resolvedCategories || "default");
   }
 
   /**
