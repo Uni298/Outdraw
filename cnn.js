@@ -1,9 +1,83 @@
 const fs = require('fs');
 const path = require('path');
 const ort = require('onnxruntime-node');
+const { createCanvas } = require('canvas');
 
 // -----------------------------------------------------
-// Bresenham / normalizeStrokes / rasterizeStrokes は元のまま
+// 軽量アンチエイリアシング描画
+// -----------------------------------------------------
+function rasterizeStrokesAA(strokes, size = 32) {
+    // 2倍解像度で描画してダウンサンプリング
+    const highRes = size * 2;
+    
+    const canvas = createCanvas(highRes, highRes);
+    const ctx = canvas.getContext('2d');
+    
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, highRes, highRes);
+    
+    let xs = [];
+    let ys = [];
+    for (const stroke of strokes) {
+        xs.push(...stroke[0]);
+        ys.push(...stroke[1]);
+    }
+    
+    if (xs.length === 0 || ys.length === 0) {
+        return new Array(size * size).fill(0);
+    }
+    
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    
+    const w = (maxX - minX) + 1e-5;
+    const h = (maxY - minY) + 1e-5;
+    
+    ctx.strokeStyle = 'black';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    for (const stroke of strokes) {
+        const points = stroke[0].map((x, i) => ({
+            x: ((x - minX) / w) * (highRes - 1),
+            y: ((stroke[1][i] - minY) / h) * (highRes - 1)
+        }));
+        
+        if (points.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.stroke();
+        }
+    }
+    
+    // ダウンサンプリング
+    const lowResCanvas = createCanvas(size, size);
+    const lowResCtx = lowResCanvas.getContext('2d');
+    
+    lowResCtx.imageSmoothingEnabled = true;
+    lowResCtx.imageSmoothingQuality = 'high';
+    lowResCtx.drawImage(canvas, 0, 0, highRes, highRes, 0, 0, size, size);
+    
+    const imageData = lowResCtx.getImageData(0, 0, size, size);
+    const pixels = imageData.data;
+    
+    const data = [];
+    for (let i = 0; i < pixels.length; i += 4) {
+        const gray = pixels[i];
+        data.push(1.0 - (gray / 255.0));
+    }
+    
+    return data;
+}
+
+// -----------------------------------------------------
+// 元の高速描画 (AA無効用)
 // -----------------------------------------------------
 function drawLine(grid, x0, y0, x1, y1, size) {
     let dx = Math.abs(x1 - x0);
@@ -14,9 +88,8 @@ function drawLine(grid, x0, y0, x1, y1, size) {
 
     while (true) {
         if (x0 >= 0 && x0 < size && y0 >= 0 && y0 < size) {
-            grid[y0][x0] = 0; // Black stroke
+            grid[y0][x0] = 0;
         }
-
         if (x0 === x1 && y0 === y1) break;
         let e2 = 2 * err;
         if (e2 > -dy) {
@@ -25,42 +98,34 @@ function drawLine(grid, x0, y0, x1, y1, size) {
         }
         if (e2 < dx) {
             err += dx;
-            x0 += 0;
             y0 += sy;
         }
     }
 }
 
-// 元の normalizeStrokes と同じ
 function normalizeStrokes(strokes, size = 32) {
     let xs = [];
     let ys = [];
-
     for (const stroke of strokes) {
         xs.push(...stroke[0]);
         ys.push(...stroke[1]);
     }
-
     if (xs.length === 0 || ys.length === 0) return [];
 
     const minX = Math.min(...xs);
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-
     const w = (maxX - minX) + 1e-5;
     const h = (maxY - minY) + 1e-5;
 
-    const normalized = strokes.map(stroke => [
+    return strokes.map(stroke => [
         stroke[0].map(x => Math.floor(((x - minX) / w) * (size - 1))),
         stroke[1].map(y => Math.floor(((y - minY) / h) * (size - 1)))
     ]);
-
-    return normalized;
 }
 
-// 元の rasterizeStrokes（返り値は 0〜1 の 32*32）
-function rasterizeStrokes(strokes, size = 32) {
+function rasterizeStrokesFast(strokes, size = 32) {
     const normalizedStrokes = normalizeStrokes(strokes, size);
     const grid = Array(size).fill().map(() => Array(size).fill(255));
 
@@ -78,49 +143,41 @@ function rasterizeStrokes(strokes, size = 32) {
             data.push(1.0 - (grid[y][x] / 255.0));
         }
     }
-    return data; // 長さ 1024 の 0〜1 float
+    return data;
 }
 
 // -----------------------------------------------------
-// CNN モデル状態
+// CNNモデル状態
 // -----------------------------------------------------
 let session = null;
 let modelNames = [];
+let useAA = true;
 
-// API: getModelNames はそのまま
 function getModelNames() {
     return modelNames;
 }
 
+function setAntialiasing(enabled) {
+    useAA = enabled;
+    console.log(`[CNN] Anti-aliasing: ${enabled ? '有効' : '無効'}`);
+}
+
 // -----------------------------------------------------
-// loadModel: 今は ONNX モデルと categories.txt を読む
-// 署名はそのまま: async function loadModel(modelDir = "png_model_32")
+// loadModel
 // -----------------------------------------------------
-async function loadModel(modelDir = "png_model_32") {
-    // ONNXモデルパス
-    const onnxPath = path.join(modelDir, "model.onnx");
+async function loadModel(modelDir = "png_model_32", categoriesFilePath = null) {
+    console.log(`[CNN] Loading model from: ${modelDir}`);
     
-    // カテゴリファイルパス (引数で指定されたファイル、または modelDir/categories.txt)
-    // Note: server.js will need to pass this, or we rely on the 2nd argument
-    // arguments: loadModel(modelDir, categoriesFilePath)
-    
-    // Check if onnx exists
+    let onnxPath = path.join(modelDir, "model_fixed.onnx");
     if (!fs.existsSync(onnxPath)) {
-        throw new Error(`ONNX model not found at ${onnxPath}`);
+        // Fallback to original if fixed version doesn't exist
+        onnxPath = path.join(modelDir, "model.onnx");
+        if (!fs.existsSync(onnxPath)) {
+             throw new Error(`ONNX model not found at ${onnxPath}`);
+        }
     }
 
-    // Load categories
-    // If categoriesFilePath is passed, use it. Otherwise default to modelDir/categories.txt
-    // Since we can't change the signature easily if used elsewhere, let's assume ai-bridge handles passing it.
-    // Wait, I need to update signature.
-    
-    let catPath;
-    if (arguments.length > 1 && arguments[1]) {
-        catPath = arguments[1]; // Use provided path
-    } else {
-        catPath = path.join(modelDir, "categories.txt");
-    }
-
+    const catPath = categoriesFilePath || path.join(modelDir, "categories.txt");
     if (!fs.existsSync(catPath)) {
         throw new Error(`categories file not found at ${catPath}`);
     }
@@ -128,18 +185,91 @@ async function loadModel(modelDir = "png_model_32") {
     const txt = fs.readFileSync(catPath, "utf-8");
     modelNames = txt.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
 
-    console.log(`[CNN] Loaded categories from: ${catPath}`);
-    console.log(`[CNN] First category: ${modelNames[0]}`);
+    console.log(`[CNN] ✅ Loaded ${modelNames.length} categories`);
 
-    // ONNX Runtime セッション作成
-    session = await ort.InferenceSession.create(onnxPath);
+    session = await ort.InferenceSession.create(onnxPath, {
+        executionProviders: ['cpu'],
+        graphOptimizationLevel: 'all'
+    });
 
-    console.log(`[CNN] Loaded ONNX model from ${onnxPath}`);
-    console.log(`[CNN] Categories: ${modelNames.length}`);
+    console.log(`[CNN] ✅ Model loaded`);
+    console.log(`[CNN] 🖥️  Provider: ${(session.executionProviders || ['unknown']).join(', ')}`);
 }
 
 // -----------------------------------------------------
-// predictStrokes: API 互換 + 内部は CNN 推論
+// TTA (Test-Time Augmentation) - 軽量版
+// -----------------------------------------------------
+function augmentStrokes(strokes, angle = 0, scale = 1.0) {
+    if (angle === 0 && scale === 1.0) return strokes;
+    
+    const cos_a = Math.cos(angle * Math.PI / 180);
+    const sin_a = Math.sin(angle * Math.PI / 180);
+    
+    return strokes.map(stroke => {
+        const xs = stroke[0];
+        const ys = stroke[1];
+        const new_xs = [];
+        const new_ys = [];
+        
+        for (let i = 0; i < xs.length; i++) {
+            const x = xs[i] - 127.5;
+            const y = ys[i] - 127.5;
+            
+            const x_r = x * cos_a - y * sin_a;
+            const y_r = x * sin_a + y * cos_a;
+            
+            new_xs.push(x_r * scale + 127.5);
+            new_ys.push(y_r * scale + 127.5);
+        }
+        
+        return [new_xs, new_ys];
+    });
+}
+
+async function predictWithTTA(strokes, size, useAA) {
+    // 5パターンの軽量TTA
+    const augmentations = [
+        { angle: 0, scale: 1.0 },
+        { angle: -5, scale: 1.0 },
+        { angle: 5, scale: 1.0 },
+        { angle: 0, scale: 0.95 },
+        { angle: 0, scale: 1.05 }
+    ];
+    
+    const allLogits = [];
+    
+    for (const aug of augmentations) {
+        const augStrokes = augmentStrokes(strokes, aug.angle, aug.scale);
+        const imgArray = useAA 
+            ? rasterizeStrokesAA(augStrokes, size)
+            : rasterizeStrokesFast(augStrokes, size);
+        
+        const inputTensor = new ort.Tensor(
+            'float32',
+            Float32Array.from(imgArray),
+            [1, 1, size, size]
+        );
+        
+        const results = await session.run({ input: inputTensor });
+        allLogits.push(Array.from(results.logits.data));
+    }
+    
+    // 平均
+    const numClasses = allLogits[0].length;
+    const avgLogits = new Array(numClasses).fill(0);
+    
+    for (let i = 0; i < numClasses; i++) {
+        for (let j = 0; j < allLogits.length; j++) {
+            avgLogits[i] += allLogits[j][i];
+        }
+        avgLogits[i] /= allLogits.length;
+    }
+    
+    return avgLogits;
+}
+
+// -----------------------------------------------------
+// predictStrokes
 // -----------------------------------------------------
 async function predictStrokes(strokes, options = {}) {
     if (!session) {
@@ -147,22 +277,33 @@ async function predictStrokes(strokes, options = {}) {
     }
 
     const size = 32;
-    const absoluteThreshold = options.absoluteThreshold || 70; // 互換用
+    const absoluteThreshold = options.absoluteThreshold || 70;
     const relativeThreshold = options.relativeThreshold || 2;
     const topNCount = options.topN || 10;
+    const useTTA = options.useTTA !== false;  // デフォルト有効
+    const currentUseAA = options.useAntialiasing !== undefined 
+        ? options.useAntialiasing 
+        : useAA;
 
-    // 入力画像（0〜1, 長さ 1024）
-    const imgArray = rasterizeStrokes(strokes, size); // JS版のまま
-    const inputTensor = new ort.Tensor(
-        'float32',
-        Float32Array.from(imgArray),
-        [1, 1, size, size]
-    );
+    let logits;
+    
+    if (useTTA) {
+        logits = await predictWithTTA(strokes, size, currentUseAA);
+    } else {
+        const imgArray = currentUseAA 
+            ? rasterizeStrokesAA(strokes, size)
+            : rasterizeStrokesFast(strokes, size);
+        
+        const inputTensor = new ort.Tensor(
+            'float32',
+            Float32Array.from(imgArray),
+            [1, 1, size, size]
+        );
+        const results = await session.run({ input: inputTensor });
+        logits = Array.from(results.logits.data);
+    }
 
-    const results = await session.run({ input: inputTensor });
-    const logits = results.logits.data; // Float32Array, 長さ num_classes
-
-    // Apply softmax to get probabilities
+    // Softmax
     const numClasses = logits.length;
     const expScores = [];
     let sumExp = 0;
@@ -175,20 +316,17 @@ async function predictStrokes(strokes, options = {}) {
     
     const probabilities = expScores.map(exp => exp / sumExp);
     
-    // Create scored array with probabilities
     const scored = [];
-    const allowList = options.allowedCategories; // Array of category names or null
+    const allowList = options.allowedCategories;
 
     for (let i = 0; i < numClasses; i++) {
         let score = logits[i];
         let prob = probabilities[i];
         const name = modelNames[i];
 
-        // Filter if allowList is provided
         if (allowList && Array.isArray(allowList) && allowList.length > 0) {
-            // Check if name is in allowList (normalized check might be safer but exact match for now)
             if (!allowList.includes(name)) {
-                score = -Infinity; // Push to bottom
+                score = -Infinity;
                 prob = 0;
             }
         }
@@ -196,19 +334,9 @@ async function predictStrokes(strokes, options = {}) {
         scored.push({ index: i, score: score, name: name, probability: prob });
     }
 
-    // If we have an allowList, we should strictly re-normalize probabilities 
-    // among the allowed items so that the best allowed item has high confidence
-    // relative to the "active" choices.
+    // 再正規化
     if (allowList && Array.isArray(allowList) && allowList.length > 0) {
-        // Filter out -Infinity (disallowed) items
         const allowedScored = scored.filter(s => s.score > -Infinity);
-        
-        // Calculate new sum of exponentials (or just sum of current probs if we utilize them)
-        // Since original probs sum to 1 including Disallowed, we can just sum the allowed probs and divide?
-        // No, softmax is non-linear. We should re-softmax the logits of allowed items?
-        // Actually, just re-normalizing existing probabilities is mathematically equivalent 
-        // to re-running softmax on just the allowed subset IF we assume "others" are impossible.
-        
         let sumAllowed = 0;
         allowedScored.forEach(s => sumAllowed += s.probability);
         
@@ -216,42 +344,32 @@ async function predictStrokes(strokes, options = {}) {
             allowedScored.forEach(s => {
                 s.probability = s.probability / sumAllowed;
             });
-            // Update original scored array references (which are objects)
         }
-        
-        // Re-sort specifically for allowed items (though they should already be sorted relative to each other)
-        // Adjust the main list to ensure non-allowed are at bottom with 0 probability
-        // (Attempted in loop but let's be sure)
     }
 
-    // Sort by probability (highest first)
     scored.sort((a, b) => b.probability - a.probability);
 
     const topN = scored.slice(0, topNCount);
-
     const best = scored[0];
     const second = scored.length > 1 ? scored[1] : { probability: 0 };
 
-    // Calculate confidence as percentage (0-100)
     const confidencePercent = Math.round(best.probability * 100);
 
-    // もともとの distance ベースのしきい値と整合を取るための
-    // ダミー距離変換（score が高いほど distance 小さいという扱い）
     function scoreToDistance(s) {
-        return -s; // 符号を反転して distance っぽくする
+        return -s;
     }
 
     const bestScore = best.score;
     const secondScore = second.score || -Infinity;
     const relativeGap = bestScore - secondScore;
 
-    const isConfident = (scoreToDistance(bestScore) < absoluteThreshold) &&
-                        (relativeGap > relativeThreshold);
+    const isConfident = (confidencePercent >= 70) && (relativeGap > relativeThreshold);
 
     const confidence = {
         absoluteDistance: scoreToDistance(bestScore),
         relativeGap: relativeGap,
         isConfident: isConfident,
+        confidencePercent: confidencePercent,
         thresholds: {
             absolute: absoluteThreshold,
             relative: relativeThreshold
@@ -261,26 +379,37 @@ async function predictStrokes(strokes, options = {}) {
     return {
         classIndex: best.index,
         className: best.name,
-        distance: scoreToDistance(bestScore), // 互換目的
-        confidencePercent: confidencePercent, // 0-100の確信度
+        distance: scoreToDistance(bestScore),
+        confidencePercent: confidencePercent,
         topN: topN.map(t => ({
             index: t.index,
             distance: scoreToDistance(t.score),
             name: t.name,
             score: t.score,
-            probability: t.probability
+            probability: t.probability,
+            confidencePercent: Math.round(t.probability * 100)
         })),
         confidence: confidence,
-        rawDistances: scored.map(s => scoreToDistance(s.score)),
-        input: Array.from(imgArray)
+        rawDistances: scored.map(s => scoreToDistance(s.score))
     };
 }
 
+// 高速モード
+async function predictStrokesFast(strokes, options = {}) {
+    return predictStrokes(strokes, { 
+        ...options, 
+        useTTA: false, 
+        useAntialiasing: false 
+    });
+}
 
 module.exports = {
     loadModel,
     predictStrokes,
+    predictStrokesFast,
     normalizeStrokes,
-    getModelNames
+    getModelNames,
+    setAntialiasing,
+    rasterizeStrokesAA,
+    rasterizeStrokesFast
 };
-

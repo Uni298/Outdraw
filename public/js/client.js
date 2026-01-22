@@ -314,7 +314,11 @@ socket.on('room-joined', (data) => {
   const roomIdValue = document.getElementById('room-id-display-value');
   if (roomIdDisplay && roomIdValue) {
     roomIdValue.textContent = data.roomId;
-    roomIdDisplay.style.display = 'flex'; // Ensure flex display matches CSS
+    if (data.player.isHost) {
+      roomIdDisplay.style.display = 'flex';
+    } else {
+      roomIdDisplay.style.display = 'none';
+    }
   }
   
   // Hide error

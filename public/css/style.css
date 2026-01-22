@@ -645,6 +645,7 @@ body::after {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 600px;
 }
 
 #drawing-canvas,
@@ -654,7 +655,6 @@ body::after {
   background: white;
   display: block;
   width: 100%;
-  flex: 1;
   image-rendering: pixelated;
 }
 
