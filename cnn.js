@@ -6,46 +6,46 @@ const { createCanvas } = require('canvas');
 // -----------------------------------------------------
 // 軽量アンチエイリアシング描画
 // -----------------------------------------------------
-function rasterizeStrokesAA(strokes, size = 32) {
+function rasterizeStrokesAA(strokes, size = 64) {
     // 2倍解像度で描画してダウンサンプリング
     const highRes = size * 2;
-    
+
     const canvas = createCanvas(highRes, highRes);
     const ctx = canvas.getContext('2d');
-    
+
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, highRes, highRes);
-    
+
     let xs = [];
     let ys = [];
     for (const stroke of strokes) {
         xs.push(...stroke[0]);
         ys.push(...stroke[1]);
     }
-    
+
     if (xs.length === 0 || ys.length === 0) {
         return new Array(size * size).fill(0);
     }
-    
+
     const minX = Math.min(...xs);
     const maxX = Math.max(...xs);
     const minY = Math.min(...ys);
     const maxY = Math.max(...ys);
-    
+
     const w = (maxX - minX) + 1e-5;
     const h = (maxY - minY) + 1e-5;
-    
+
     ctx.strokeStyle = 'black';
     ctx.lineWidth = 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    
+
     for (const stroke of strokes) {
         const points = stroke[0].map((x, i) => ({
             x: ((x - minX) / w) * (highRes - 1),
             y: ((stroke[1][i] - minY) / h) * (highRes - 1)
         }));
-        
+
         if (points.length > 1) {
             ctx.beginPath();
             ctx.moveTo(points[0].x, points[0].y);
@@ -55,24 +55,24 @@ function rasterizeStrokesAA(strokes, size = 32) {
             ctx.stroke();
         }
     }
-    
+
     // ダウンサンプリング
     const lowResCanvas = createCanvas(size, size);
     const lowResCtx = lowResCanvas.getContext('2d');
-    
+
     lowResCtx.imageSmoothingEnabled = true;
     lowResCtx.imageSmoothingQuality = 'high';
     lowResCtx.drawImage(canvas, 0, 0, highRes, highRes, 0, 0, size, size);
-    
+
     const imageData = lowResCtx.getImageData(0, 0, size, size);
     const pixels = imageData.data;
-    
+
     const data = [];
     for (let i = 0; i < pixels.length; i += 4) {
         const gray = pixels[i];
         data.push(1.0 - (gray / 255.0));
     }
-    
+
     return data;
 }
 
@@ -103,7 +103,7 @@ function drawLine(grid, x0, y0, x1, y1, size) {
     }
 }
 
-function normalizeStrokes(strokes, size = 32) {
+function normalizeStrokes(strokes, size = 64) {
     let xs = [];
     let ys = [];
     for (const stroke of strokes) {
@@ -125,7 +125,7 @@ function normalizeStrokes(strokes, size = 32) {
     ]);
 }
 
-function rasterizeStrokesFast(strokes, size = 32) {
+function rasterizeStrokesFast(strokes, size = 64) {
     const normalizedStrokes = normalizeStrokes(strokes, size);
     const grid = Array(size).fill().map(() => Array(size).fill(255));
 
@@ -165,15 +165,16 @@ function setAntialiasing(enabled) {
 // -----------------------------------------------------
 // loadModel
 // -----------------------------------------------------
-async function loadModel(modelDir = "png_model_32", categoriesFilePath = null) {
+async function loadModel(modelDir = "png_model_64", categoriesFilePath = null) {
+    modelDir = "png_model_64";
     console.log(`[CNN] Loading model from: ${modelDir}`);
-    
+
     let onnxPath = path.join(modelDir, "model_fixed.onnx");
     if (!fs.existsSync(onnxPath)) {
         // Fallback to original if fixed version doesn't exist
         onnxPath = path.join(modelDir, "model.onnx");
         if (!fs.existsSync(onnxPath)) {
-             throw new Error(`ONNX model not found at ${onnxPath}`);
+            throw new Error(`ONNX model not found at ${onnxPath}`);
         }
     }
 
@@ -201,27 +202,27 @@ async function loadModel(modelDir = "png_model_32", categoriesFilePath = null) {
 // -----------------------------------------------------
 function augmentStrokes(strokes, angle = 0, scale = 1.0) {
     if (angle === 0 && scale === 1.0) return strokes;
-    
+
     const cos_a = Math.cos(angle * Math.PI / 180);
     const sin_a = Math.sin(angle * Math.PI / 180);
-    
+
     return strokes.map(stroke => {
         const xs = stroke[0];
         const ys = stroke[1];
         const new_xs = [];
         const new_ys = [];
-        
+
         for (let i = 0; i < xs.length; i++) {
             const x = xs[i] - 127.5;
             const y = ys[i] - 127.5;
-            
+
             const x_r = x * cos_a - y * sin_a;
             const y_r = x * sin_a + y * cos_a;
-            
+
             new_xs.push(x_r * scale + 127.5);
             new_ys.push(y_r * scale + 127.5);
         }
-        
+
         return [new_xs, new_ys];
     });
 }
@@ -235,36 +236,36 @@ async function predictWithTTA(strokes, size, useAA) {
         { angle: 0, scale: 0.95 },
         { angle: 0, scale: 1.05 }
     ];
-    
+
     const allLogits = [];
-    
+
     for (const aug of augmentations) {
         const augStrokes = augmentStrokes(strokes, aug.angle, aug.scale);
-        const imgArray = useAA 
+        const imgArray = useAA
             ? rasterizeStrokesAA(augStrokes, size)
             : rasterizeStrokesFast(augStrokes, size);
-        
+
         const inputTensor = new ort.Tensor(
             'float32',
             Float32Array.from(imgArray),
             [1, 1, size, size]
         );
-        
+
         const results = await session.run({ input: inputTensor });
         allLogits.push(Array.from(results.logits.data));
     }
-    
+
     // 平均
     const numClasses = allLogits[0].length;
     const avgLogits = new Array(numClasses).fill(0);
-    
+
     for (let i = 0; i < numClasses; i++) {
         for (let j = 0; j < allLogits.length; j++) {
             avgLogits[i] += allLogits[j][i];
         }
         avgLogits[i] /= allLogits.length;
     }
-    
+
     return avgLogits;
 }
 
@@ -276,24 +277,24 @@ async function predictStrokes(strokes, options = {}) {
         throw new Error("Model not loaded. Call loadModel() first.");
     }
 
-    const size = 32;
+    const size = 64;
     const absoluteThreshold = options.absoluteThreshold || 70;
     const relativeThreshold = options.relativeThreshold || 2;
     const topNCount = options.topN || 10;
     const useTTA = options.useTTA !== false;  // デフォルト有効
-    const currentUseAA = options.useAntialiasing !== undefined 
-        ? options.useAntialiasing 
+    const currentUseAA = options.useAntialiasing !== undefined
+        ? options.useAntialiasing
         : useAA;
 
     let logits;
-    
+
     if (useTTA) {
         logits = await predictWithTTA(strokes, size, currentUseAA);
     } else {
-        const imgArray = currentUseAA 
+        const imgArray = currentUseAA
             ? rasterizeStrokesAA(strokes, size)
             : rasterizeStrokesFast(strokes, size);
-        
+
         const inputTensor = new ort.Tensor(
             'float32',
             Float32Array.from(imgArray),
@@ -307,15 +308,15 @@ async function predictStrokes(strokes, options = {}) {
     const numClasses = logits.length;
     const expScores = [];
     let sumExp = 0;
-    
+
     for (let i = 0; i < numClasses; i++) {
         const expVal = Math.exp(logits[i]);
         expScores.push(expVal);
         sumExp += expVal;
     }
-    
+
     const probabilities = expScores.map(exp => exp / sumExp);
-    
+
     const scored = [];
     const allowList = options.allowedCategories;
 
@@ -339,7 +340,7 @@ async function predictStrokes(strokes, options = {}) {
         const allowedScored = scored.filter(s => s.score > -Infinity);
         let sumAllowed = 0;
         allowedScored.forEach(s => sumAllowed += s.probability);
-        
+
         if (sumAllowed > 0) {
             allowedScored.forEach(s => {
                 s.probability = s.probability / sumAllowed;
@@ -396,10 +397,10 @@ async function predictStrokes(strokes, options = {}) {
 
 // 高速モード
 async function predictStrokesFast(strokes, options = {}) {
-    return predictStrokes(strokes, { 
-        ...options, 
-        useTTA: false, 
-        useAntialiasing: false 
+    return predictStrokes(strokes, {
+        ...options,
+        useTTA: false,
+        useAntialiasing: false
     });
 }
 

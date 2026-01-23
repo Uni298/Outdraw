@@ -5,7 +5,7 @@ class AIBridge {
   /**
    * @param {string} modelDir - TensorFlow.js のモデルが格納されたディレクトリ
    */
-  constructor(modelDir = "png_model_32", categoriesFile = null) {
+  constructor(modelDir = "png_model_64", categoriesFile = null) {
     this.modelDir = modelDir;
     this.categoriesFile = categoriesFile;
     this.isReady = false;
