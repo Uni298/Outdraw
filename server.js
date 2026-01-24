@@ -46,7 +46,8 @@ function emitRoomState(roomId) {
     roundResults: room.roundResults,
     activeCategoryIndices: room.activeCategoryIndices,
     currentDrawer: room.currentDrawer, // Keep existing properties
-    settings: room.settings // Keep existing properties
+    settings: room.settings, // Keep existing properties
+    isPaused: room.isPaused // Add pause state
   };
 
   if (state.roundResults && state.roundResults.drawing) {
@@ -255,6 +256,36 @@ io.on('connection', (socket) => {
     const room = gameManager.getRoomBySocketId(socket.id);
     if (room) {
       gameManager.endGame(room.id, socket.id);
+    }
+  });
+
+  // Pause Game (Host Only)
+  socket.on('pause-game', (roomId) => {
+    const room = gameManager.getRoom(roomId);
+    if (!room || room.host !== socket.id) return;
+    
+    if (gameManager.pauseGame(roomId)) {
+        emitRoomState(roomId);
+    }
+  });
+
+  // Resume Game (Host Only)
+  socket.on('resume-game', (roomId) => {
+    const room = gameManager.getRoom(roomId);
+    if (!room || room.host !== socket.id) return;
+    
+    if (gameManager.resumeGame(roomId)) {
+        emitRoomState(roomId);
+    }
+  });
+
+  // Abort Game (Host Only)
+  socket.on('abort-game', (roomId) => {
+    const room = gameManager.getRoom(roomId);
+    if (!room || room.host !== socket.id) return;
+    
+    if (gameManager.abortGame(roomId)) {
+        emitRoomState(roomId);
     }
   });
 

@@ -549,25 +549,34 @@ body::after {
 
 /* Category Selection */
 .category-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center; /* Changed from flex-start to center vertically */
+  align-content: center;
+  gap: 1.5rem;
+  max-width: 1200px; /* Increased from 1000px to allow more horizontal space */
+  width: 100%;
   margin: 0 auto;
+  padding: 1rem;
   flex: 1;
-  align-content: start;
 }
 
 .category-card {
   background: var(--card-bg);
   padding: 1.5rem 1rem;
   text-align: center;
-  font-size: 1.1rem;
+  font-size: 1.5rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.1s;
-  border: 3px solid var(--border-color);
+  border: 4px solid var(--border-color);
   text-transform: uppercase;
+  min-width: 220px;
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .category-card:hover {
@@ -1226,7 +1235,7 @@ body::after {
   padding: 0.5rem;
   border-radius: 8px;
   border: 3px solid var(--border-color);
-  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
 }
 
 .floating-reaction-bar .reaction-btn {
@@ -1250,7 +1259,6 @@ body::after {
 .floating-reaction-bar .reaction-btn:active {
   transform: scale(0.95);
 }
-
 
 /* Chat Box */
 #chatBox {
@@ -1445,8 +1453,8 @@ body::after {
 }
 
 /* Force Score Text White */
-.score-item, 
-.score-name, 
+.score-item,
+.score-name,
 .score-value,
 .player-list-small .player-item,
 .player-list-small .player-name,
@@ -1467,11 +1475,13 @@ body::after {
 /* Results Screen Scroll Setup */
 .results-content {
   overflow-y: auto;
-  max-height: calc(100vh - 200px); /* Ensure it fits within screen with header/footer */
+  max-height: calc(
+    100vh - 200px
+  ); /* Ensure it fits within screen with header/footer */
   padding-bottom: 2rem;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
-  
+
   /* Center layout with margins */
   max-width: 1000px;
   margin: 0 auto;
@@ -1490,8 +1500,9 @@ canvas {
   display: block;
 }
 
-#confidence-number, .confidence-value {
-  font-family: 'DotGothic16', sans-serif;
+#confidence-number,
+.confidence-value {
+  font-family: "DotGothic16", sans-serif;
   letter-spacing: 4px; /* Increased from 2px */
   margin-right: -4px; /* Counter-balance the last character spacing */
   text-shadow: none !important;
@@ -1500,8 +1511,6 @@ canvas {
 #confidence-number {
   padding-right: 4px; /* Increased to 4px as requested */
 }
-
-
 
 /* Chat is 300px wide + ~20px margin/padding when open, so 320px is good. */
 /* When minimized, chat is 50px wide relative to right edge + margins. */
@@ -1548,7 +1557,7 @@ body:has(#chatBox.minimized) .floating-reaction-bar {
   padding: 0.5rem;
   border-radius: 8px;
   border: 3px solid var(--border-color);
-  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.2);
   transition: right 0.3s; /* Animate position change */
 }
 #chatMessages::-webkit-scrollbar {
@@ -1600,7 +1609,6 @@ body:has(#chatBox.minimized) .floating-reaction-bar {
   opacity: 0;
   visibility: hidden; /* Add visibility hidden to be sure */
 }
-
 
 #results-screen.visible {
   opacity: 1;
@@ -1716,7 +1724,7 @@ body:has(#chatBox.minimized) .floating-reaction-bar {
   transform: translate(-50%, -50%);
   text-align: center;
   color: white;
-  font-family: 'DotGothic16', sans-serif;
+  font-family: "DotGothic16", sans-serif;
 }
 
 .confidence-label {

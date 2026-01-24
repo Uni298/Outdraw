@@ -22,6 +22,34 @@
         font-size: 14px;
         cursor: pointer;
       }
+      
+      /* Row Filters */
+      .row-filters-container {
+        margin-bottom: 10px;
+        overflow-x: auto;
+      }
+      .row-filters {
+        display: flex;
+        gap: 4px;
+        flex-wrap: wrap;
+      }
+      .row-filter-btn {
+        padding: 4px 8px;
+        font-size: 12px;
+        background: #eee;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .row-filter-btn:hover {
+        background: #ddd;
+      }
+      .row-filter-btn.active {
+        background: #4A90E2;
+        color: white;
+        border-color: #357ABD;
+      }
     </style>
   </head>
   <body>
@@ -164,6 +192,34 @@
                   <label for="allow-clear-canvas">クリアボタンを許可</label>
                   <input type="checkbox" id="allow-clear-canvas" checked />
                 </div>
+                <div class="setting-item">
+                  <label for="topic-choice-count">お題の選択肢数</label>
+                  <input
+                    type="number"
+                    id="topic-choice-count"
+                    min="1"
+                    max="3"
+                    value="3"
+                  />
+                </div>
+                <div class="setting-item">
+                  <label for="canvas-size">キャンバスサイズ</label>
+                  <select id="canvas-size">
+                    <option value="600x600">600 x 600</option>
+                    <option value="800x600" selected>800 x 600</option>
+                    <option value="1000x800">1000 x 800</option>
+                  </select>
+                </div>
+                <div class="setting-item">
+                  <label for="pen-thickness">ペンの太さ</label>
+                  <input
+                    type="number"
+                    id="pen-thickness"
+                    min="1"
+                    max="50"
+                    value="10"
+                  />
+                </div>
               </div>
               <button
                 id="update-settings-btn"
@@ -228,6 +284,9 @@
               <!-- Spectator Category Viewer -->
               <div class="card" id="spectator-category-card" style="display: none;">
                 <h3>回答の候補</h3>
+                <div class="row-filters-container">
+                    <div id="spectator-row-filters" class="row-filters"></div>
+                </div>
                 <div class="input-group">
                   <input
                     type="text"
@@ -285,6 +344,9 @@
             <div class="sidebar">
               <div class="card">
                 <h3>この絵は何?</h3>
+                <div class="row-filters-container">
+                  <div id="guessing-row-filters" class="row-filters"></div>
+                </div>
                 <div class="input-group">
                   <input
                     type="text"
@@ -439,6 +501,7 @@
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/translations.js"></script>
+    <script src="/js/category_readings.js"></script>
     <script src="/js/canvas.js"></script>
     <script src="/js/ui.js"></script>
     <script src="/js/client.js"></script>

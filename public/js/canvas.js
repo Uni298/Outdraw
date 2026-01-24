@@ -141,6 +141,26 @@ class DrawingCanvas {
     this.clear();
     strokes.forEach(stroke => this.addStroke(stroke));
   }
+  
+  resize(width, height) {
+    // Save current strokes
+    const savedStrokes = [...this.strokes];
+    
+    // Resize canvas
+    this.canvas.width = width;
+    this.canvas.height = height;
+    
+    // Reapply canvas settings
+    this.setupCanvas();
+    
+    // Redraw strokes
+    this.strokes = [];
+    savedStrokes.forEach(stroke => this.addStroke(stroke));
+  }
+  
+  setLineWidth(width) {
+      this.ctx.lineWidth = width;
+  }
 }
 
 // Export for use in other scripts

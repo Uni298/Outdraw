@@ -92,7 +92,15 @@ class GameManager {
 
         allowClearCanvas: true, // Default: Clear button allowed
 
-        maxPlayers: 8 // Maximum number of players allowed
+        maxPlayers: 8, // Maximum number of players allowed
+
+        topicChoiceCount: 3, // Number of topic choices for drawer
+
+        canvasWidth: 800, // Canvas width
+
+        canvasHeight: 600, // Canvas height
+
+        penThickness: 10 // Pen thickness
 
       },
 
@@ -191,6 +199,105 @@ class GameManager {
   }
 
 
+
+  pauseGame(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room || room.isPaused) return false;
+    
+    room.isPaused = true;
+    
+    // Cache remaining time
+    if (room.timer) {
+        clearTimeout(room.timer);
+        room.timer = null;
+        
+        const now = Date.now();
+        const elapsed = (now - room.roundStartTime) / 1000;
+        
+        // Calculate original duration based on state
+        let duration = 0;
+        if (room.gameState === 'drawing') duration = room.settings.drawingTimeSeconds;
+        else if (room.gameState === 'guessing') duration = room.settings.guessingTimeSeconds;
+        else if (room.gameState === 'category-selection') duration = 15; // default implicit?
+        
+        room.remainingTime = Math.max(0, duration - elapsed);
+    }
+    
+    console.log(`[Game Manager] Room ${roomId} paused. Remaining time: ${room.remainingTime.toFixed(1)}s`);
+    return true;
+  }
+
+  resumeGame(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room || !room.isPaused) return false;
+    
+    room.isPaused = false;
+    room.roundStartTime = Date.now() - ((room.settings[room.gameState === 'drawing' ? 'drawingTimeSeconds' : 'guessingTimeSeconds'] || 0) - room.remainingTime) * 1000;
+    // Actually, simpler logic:
+    // We want to fire the callback after room.remainingTime seconds.
+    // And we need to fake `roundStartTime` so that `emitRoomState` calculates correct remaining time.
+    // `emitRoomState` does: duration - (now - start)
+    // So: additional_elapsed = duration - remaining
+    // now - start = additional_elapsed
+    // start = now - additional_elapsed
+    
+    const duration = room.gameState === 'drawing' ? room.settings.drawingTimeSeconds : 
+                     (room.gameState === 'guessing' ? room.settings.guessingTimeSeconds : 15);
+                     
+    // Reset start time so that calculated remaining time matches the stored remainingTime                 
+    room.roundStartTime = Date.now() - (duration - room.remainingTime) * 1000;
+
+    // Restart timer
+    if (room.remainingTime > 0) {
+        const callback = () => {
+             if (room.gameState === 'drawing') {
+                 this.endDrawingPhase(roomId).then(() => { if (this.onStateChange) this.onStateChange(roomId); });
+             } else if (room.gameState === 'guessing') {
+                 this.endGuessingPhase(roomId);
+                 if (this.onStateChange) this.onStateChange(roomId);
+             }
+        };
+        room.timer = setTimeout(callback, room.remainingTime * 1000);
+    } else {
+        // Immediate finish if time was up
+         if (room.gameState === 'drawing') {
+             this.endDrawingPhase(roomId).then(() => { if (this.onStateChange) this.onStateChange(roomId); });
+         } else if (room.gameState === 'guessing') {
+             this.endGuessingPhase(roomId);
+             if (this.onStateChange) this.onStateChange(roomId);
+         }
+    }
+
+    console.log(`[Game Manager] Room ${roomId} resumed`);
+    return true;
+  }
+
+  abortGame(roomId) {
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+    
+    // Clear any active timers
+    if (room.timer) {
+      clearTimeout(room.timer);
+      room.timer = null;
+    }
+    
+    // Reset game state to lobby
+    room.gameState = 'lobby';
+    room.currentRound = 0;
+    room.currentDrawer = null;
+    room.currentCategory = null;
+    room.categoryChoices = [];
+    room.currentDrawing = [];
+    room.guesses.clear();
+    room.aiPredictions = [];
+    room.isPaused = false;
+    room.remainingTime = 0;
+    room.drawersHistory = [];
+    
+    console.log(`[Game Manager] Game aborted in room ${roomId}`);
+    return true;
+  }
 
   leaveRoom(roomId, socketId) {
 
@@ -380,9 +487,10 @@ class GameManager {
 
 
 
-    // Generate 3 random categories
+    // Generate random categories based on setting
 
-    room.categoryChoices = this.getRandomCategories(room, 3);
+    const choiceCount = room.settings.topicChoiceCount || 3;
+    room.categoryChoices = this.getRandomCategories(room, choiceCount);
 
 
 

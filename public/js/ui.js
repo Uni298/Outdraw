@@ -162,6 +162,14 @@ class UIManager {
     const guessRoundSpan = document.getElementById('guess-round');
     if (guessRoundSpan) guessRoundSpan.textContent = state.currentRound;
 
+    // Handle Canvas Size
+    if (state.settings && state.settings.canvasWidth && state.settings.canvasHeight) {
+        this.resizeCanvases(state.settings.canvasWidth, state.settings.canvasHeight);
+    }
+    
+    // Handle Pause
+    this.handlePauseState(state.isPaused);
+
     // Handle screen switching based on game state
     switch (state.gameState) {
       case 'lobby':
@@ -451,6 +459,88 @@ class UIManager {
   showSuccess(message) {
     // Could implement a toast notification here
     console.log('Success:', message);
+  }
+
+  populateRowFilters(containerId, onSelect) {
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      
+      container.innerHTML = '';
+      
+      const rows = ['あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', '全て'];
+      
+      rows.forEach(row => {
+         const btn = document.createElement('div');
+         btn.className = 'row-filter-btn';
+         btn.textContent = row;
+         btn.onclick = () => {
+             // Toggle active class
+             container.querySelectorAll('.row-filter-btn').forEach(b => b.classList.remove('active'));
+             btn.classList.add('active');
+             
+             onSelect(row === '全て' ? null : row);
+         };
+         
+         if (row === '全て') btn.classList.add('active');
+         
+         container.appendChild(btn);
+      });
+  }
+  
+  handlePauseState(isPaused) {
+      const overlayId = 'pause-overlay';
+      let overlay = document.getElementById(overlayId);
+      
+      if (isPaused) {
+          if (!overlay) {
+              overlay = document.createElement('div');
+              overlay.id = overlayId;
+              overlay.style.position = 'fixed';
+              overlay.style.top = '0';
+              overlay.style.left = '0';
+              overlay.style.width = '100%';
+              overlay.style.height = '100%';
+              overlay.style.background = 'rgba(0,0,0,0.5)';
+              overlay.style.color = 'white';
+              overlay.style.display = 'flex';
+              overlay.style.justifyContent = 'center';
+              overlay.style.alignItems = 'center';
+              overlay.style.fontSize = '48px';
+              overlay.style.fontWeight = 'bold';
+              overlay.style.zIndex = '3000';
+              overlay.textContent = 'PAUSED';
+              document.body.appendChild(overlay);
+          }
+          overlay.style.display = 'flex';
+          
+          // Update button text
+           ['drawing', 'guessing'].forEach(phase => {
+              const btn = document.getElementById(`end-game-btn-${phase}`);
+              if (btn) btn.textContent = '再開';
+           });
+          
+      } else {
+          if (overlay) overlay.style.display = 'none';
+          
+          // Update button text
+           ['drawing', 'guessing'].forEach(phase => {
+              const btn = document.getElementById(`end-game-btn-${phase}`);
+              if (btn) btn.textContent = '中断';
+           });
+      }
+  }
+  
+  resizeCanvases(width, height) {
+      if (!width || !height) return;
+      ['drawing-canvas', 'guess-canvas'].forEach(id => {
+          const canvas = document.getElementById(id);
+          if (canvas) {
+              if (canvas.width !== width || canvas.height !== height) {
+                  canvas.width = width;
+                  canvas.height = height;
+              }
+          }
+      });
   }
 }
 

@@ -7,6 +7,7 @@ let currentGameState = null;
 let timerInterval = null;
 let categories = [];
 let selectedCategory = null;
+let selectedCategoryRow = null; 
 
 // Modal confirmation
 let modalResolve = null;
@@ -118,6 +119,9 @@ async function loadCategories() {
       .map(line => line.trim())
       .filter(line => line.length > 0);
     console.log(`Loaded ${categories.length} categories`);
+    
+    // Initial population
+    populateCategoryList();
   } catch (err) {
     console.error('Failed to load categories:', err);
   }
@@ -142,6 +146,30 @@ function populateCategoryList(targetId = 'category-list', onSelect = selectCateg
   }
 
   displayCategories.forEach(category => {
+    // Filter by Row if selected
+    if (selectedCategoryRow) {
+         let reading = category;
+         if (window.CATEGORY_READINGS && window.CATEGORY_READINGS[category]) {
+             reading = window.CATEGORY_READINGS[category];
+         }
+         
+         const firstChar = reading.charAt(0); // Use reading
+         const hiraganaRows = {
+            'あ': ['あ', 'い', 'う', 'え', 'お', 'ア', 'イ', 'ウ', 'エ', 'オ'],
+            'か': ['か', 'き', 'く', 'け', 'こ', 'が', 'ぎ', 'ぐ', 'げ', 'ご', 'カ', 'キ', 'ク', 'ケ', 'コ', 'ガ', 'ギ', 'グ', 'ゲ', 'ゴ'],
+            'さ': ['さ', 'し', 'す', 'せ', 'そ', 'ざ', 'じ', 'ず', 'ぜ', 'ぞ', 'サ', 'シ', 'ス', 'セ', 'ソ', 'ザ', 'ジ', 'ズ', 'ゼ', 'ゾ'],
+            'た': ['た', 'ち', 'つ', 'て', 'と', 'だ', 'ぢ', 'づ', 'で', 'ど', 'タ', 'チ', 'ツ', 'テ', 'ト', 'ダ', 'ヂ', 'ヅ', 'デ', 'ド'],
+            'な': ['な', 'に', 'ぬ', 'ね', 'の', 'ナ', 'ニ', 'ヌ', 'ネ', 'ノ'],
+            'は': ['は', 'ひ', 'ふ', 'へ', 'ほ', 'ば', 'び', 'ぶ', 'べ', 'ぼ', 'ぱ', 'ぴ', 'ぷ', 'ぺ', 'ぽ', 'ハ', 'ヒ', 'フ', 'ヘ', 'ホ', 'バ', 'ビ', 'ブ', 'ベ', 'ボ', 'パ', 'ピ', 'プ', 'ペ', 'ポ'],
+            'ま': ['ま', 'み', 'む', 'め', 'も', 'マ', 'ミ', 'ム', 'メ', 'モ'],
+            'や': ['や', 'ゆ', 'よ', 'ヤ', 'ユ', 'ヨ'],
+            'ら': ['ら', 'り', 'る', 'れ', 'ろ', 'ラ', 'リ', 'ル', 'レ', 'ロ'],
+            'わ': ['わ', 'を', 'ん', 'ワ', 'ヲ', 'ン']
+        };
+        const allowed = new Set(hiraganaRows[selectedCategoryRow] || []);
+        if (!allowed.has(firstChar)) return; // Skip
+    }
+  
     const item = document.createElement('div');
     item.className = 'category-item';
     item.textContent = category;
@@ -266,6 +294,42 @@ function initializeEventListeners() {
       }
     };
   }
+  
+  
+  // Abort Game Buttons
+  ['drawing', 'guessing'].forEach(phase => {
+      const btn = document.getElementById(`end-game-btn-${phase}`);
+      if (btn) {
+          btn.onclick = async () => {
+              const confirmed = await showModal('ゲーム中断', '本当にゲームを中断してロビーに戻りますか?');
+              if (confirmed) {
+                  socket.emit('abort-game', ui.roomId);
+              }
+          };
+      }
+  });
+
+  // Populate Filter Checkboxes
+  // ui.populateCategoryFilters(); // Removed
+  
+  // Initialize Row Filters (for guessing)
+  ui.populateRowFilters('guessing-row-filters', (row) => {
+      selectedCategoryRow = row;
+      // Refresh list
+      populateCategoryList('category-list', selectCategoryForGuess);
+  });
+  
+  // Initialize Row Filters (for spectator)
+  ui.populateRowFilters('spectator-row-filters', (row) => {
+      selectedCategoryRow = row;
+      // Refresh list
+      populateCategoryList('drawing-category-list', (category) => {
+           const list = document.getElementById('drawing-category-list');
+           list.querySelectorAll('.category-item').forEach(i => i.classList.remove('selected'));
+           const active = Array.from(list.querySelectorAll('.category-item')).find(i => i.textContent === category);
+           if (active) active.classList.add('selected');
+      });
+  });
 }
 
 // Socket event handlers
@@ -298,13 +362,32 @@ socket.on('room-joined', (data) => {
   ui.update(data);
   
   // Update settings in UI
-  document.getElementById('drawing-time').value = data.settings.drawingTimeSeconds;
-  document.getElementById('guessing-time').value = data.settings.guessingTimeSeconds;
-  document.getElementById('ai-top-n').value = data.settings.aiTopN;
-  document.getElementById('max-rounds').value = data.settings.maxRounds;
-  document.getElementById('active-category-count').value = data.settings.activeCategoryCount;
-  document.getElementById('max-players').value = data.settings.maxPlayers || 8;
-  document.getElementById('allow-clear-canvas').checked = data.settings.allowClearCanvas;
+  if (data.settings) {
+      document.getElementById('drawing-time').value = data.settings.drawingTimeSeconds;
+      document.getElementById('guessing-time').value = data.settings.guessingTimeSeconds;
+      document.getElementById('ai-top-n').value = data.settings.aiTopN;
+      document.getElementById('max-rounds').value = data.settings.maxRounds;
+      document.getElementById('active-category-count').value = data.settings.activeCategoryCount;
+      document.getElementById('max-players').value = data.settings.maxPlayers || 8;
+      document.getElementById('allow-clear-canvas').checked = data.settings.allowClearCanvas;
+      
+      if (data.settings.topicChoiceCount) document.getElementById('topic-choice-count').value = data.settings.topicChoiceCount;
+      if (data.settings.penThickness) {
+          document.getElementById('pen-thickness').value = data.settings.penThickness;
+          if (drawingCanvas) drawingCanvas.setLineWidth(data.settings.penThickness);
+      }
+      if (data.settings.canvasWidth && data.settings.canvasHeight) {
+          document.getElementById('canvas-size').value = `${data.settings.canvasWidth}x${data.settings.canvasHeight}`;
+          
+          // Resize canvases
+          if (drawingCanvas) {
+            drawingCanvas.resize(data.settings.canvasWidth, data.settings.canvasHeight);
+          }
+          if (guessCanvas) {
+            guessCanvas.resize(data.settings.canvasWidth, data.settings.canvasHeight);
+          }
+      }
+  }
 
   // Show room code
   document.getElementById('room-code-display').textContent = data.roomId;
@@ -326,7 +409,7 @@ socket.on('room-joined', (data) => {
 
   // If game is already running, switch to game screen immediately
   if (data.gameState !== 'lobby') {
-    ui.setHostControls(data.player.isHost); // Ensure controls are set
+    ui.setHostControls(data.player.isHost);
     ui.update(data);
   }
 });
@@ -339,6 +422,23 @@ socket.on('settings-updated', (settings) => {
   document.getElementById('active-category-count').value = settings.activeCategoryCount;
   document.getElementById('max-players').value = settings.maxPlayers || 8;
   document.getElementById('allow-clear-canvas').checked = settings.allowClearCanvas;
+  
+  if (settings.topicChoiceCount) document.getElementById('topic-choice-count').value = settings.topicChoiceCount;
+  if (settings.penThickness) {
+      document.getElementById('pen-thickness').value = settings.penThickness;
+      if (drawingCanvas) drawingCanvas.setLineWidth(settings.penThickness);
+  }
+  if (settings.canvasWidth && settings.canvasHeight) {
+      document.getElementById('canvas-size').value = `${settings.canvasWidth}x${settings.canvasHeight}`;
+      
+      // Resize canvases
+      if (drawingCanvas) {
+        drawingCanvas.resize(settings.canvasWidth, settings.canvasHeight);
+      }
+      if (guessCanvas) {
+        guessCanvas.resize(settings.canvasWidth, settings.canvasHeight);
+      }
+  }
   
   ui.showSuccess('設定が更新されました');
 });
@@ -732,8 +832,16 @@ function updateSettings() {
     maxRounds: parseInt(document.getElementById('max-rounds').value),
     activeCategoryCount: parseInt(document.getElementById('active-category-count').value),
     maxPlayers: parseInt(document.getElementById('max-players').value),
-    allowClearCanvas: document.getElementById('allow-clear-canvas').checked
+    allowClearCanvas: document.getElementById('allow-clear-canvas').checked,
+    topicChoiceCount: parseInt(document.getElementById('topic-choice-count').value),
+    penThickness: parseInt(document.getElementById('pen-thickness').value),
+    canvasSize: document.getElementById('canvas-size').value // '800x600'
   };
+  
+  // Parse canvas size
+  const [w, h] = settings.canvasSize.split('x').map(Number);
+  settings.canvasWidth = w;
+  settings.canvasHeight = h;
 
   socket.emit('update-settings', {
     roomId: ui.roomId,
@@ -745,6 +853,14 @@ function updateSettings() {
 
 function startGame() {
   socket.emit('start-game', ui.roomId);
+}
+
+function pauseGame() {
+    socket.emit('pause-game', ui.roomId);
+}
+
+function resumeGame() {
+    socket.emit('resume-game', ui.roomId);
 }
 
 async function endDrawing() {
