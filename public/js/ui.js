@@ -19,6 +19,16 @@ class UIManager {
       screen.classList.add('active');
       this.currentScreen = screenId;
     }
+
+    // Stop physics animation if leaving category-screen (or generally anytime we switch)
+    // We only want it running while actively waiting in category-screen
+    // Safest to stop it whenever switching screens, unless it's to the same screen?
+    // But showScreen is usually called when switching.
+    // However, if we are staying in category selection, we might want to keep it?
+    // For simplicity, let's stop it here, and the specific logic in update() will restart it if needed.
+    if (window.stopPhysicsAnimation) {
+        window.stopPhysicsAnimation();
+    }
   }
 
   updatePlayerList(players, currentDrawerId = null) {
@@ -183,10 +193,12 @@ class UIManager {
           document.getElementById('category-choices').style.display = 'grid'; // or flex/block
           document.getElementById('waiting-category').classList.add('hidden');
           this.updateCategoryChoices(state.categoryChoices);
+          if (window.stopPhysicsAnimation) window.stopPhysicsAnimation();
         } else {
           // I am waiter
           document.getElementById('category-choices').style.display = 'none';
           document.getElementById('waiting-category').classList.remove('hidden');
+          if (window.startPhysicsAnimation) window.startPhysicsAnimation();
         }
         break;
       case 'drawing':

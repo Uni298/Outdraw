@@ -243,8 +243,11 @@
           <h2 class="phase-title">お題を選んでください</h2>
           <div id="category-choices" class="category-grid"></div>
           <div id="waiting-category" class="waiting hidden">
-            <div class="spinner"></div>
+            <!-- <div class="spinner"></div> -->
             <p>描く人がお題を選んでいます...</p>
+            <div class="physics-container" style="display: flex; justify-content: center; margin-top: 20px;">
+                <canvas id="physics-world" width="500" height="500"></canvas>
+            </div>
           </div>
         </div>
       </div>
@@ -498,6 +501,10 @@
         <button id="chatSendBtn">送信</button>
       </div>
     </div>
+
+    <!-- Physics Engine -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <script src="/js/waiting_animation.js"></script>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/translations.js"></script>
